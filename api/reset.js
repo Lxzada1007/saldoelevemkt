@@ -14,6 +14,7 @@ export default async function handler(req, res) {
       access: "public",
       contentType: "application/json",
       allowOverwrite: true,
+      addRandomSuffix: false,
       cacheControlMaxAge: 0
     });
     res.status(200).json({ ok: true });

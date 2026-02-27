@@ -23,3 +23,7 @@ Este build salva o JSON como **Blob público** (para simplificar a leitura sem p
 
 ## Fix: dados sumiam no refresh
 Este build salva imediatamente após a importação e também tenta salvar com `keepalive` ao atualizar/fechar a aba.
+
+
+## Persistência por pathname fixo
+Este build usa `addRandomSuffix: false` + `allowOverwrite: true` para manter sempre o mesmo arquivo `saldo/state.json`.
