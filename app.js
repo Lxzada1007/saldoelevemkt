@@ -499,7 +499,7 @@ async function boot(){
   render();
   runDailyAutomation();
 
-  document.getElementById("importBtn").addEventListener("click", () => {
+  document.getElementById("importBtn").addEventListener("click", async () => {
     const text = document.getElementById("importText").value;
     const items = parseImportedList(text);
     if(items.length === 0){
