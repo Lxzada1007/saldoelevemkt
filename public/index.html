@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lista de Saldo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel">
+      <header class="panel__header">
+        <div>
+          <h1>Lista de Saldo</h1>
+          <p class="muted">Débito automático diário às <strong>08:00</strong> (1x por dia, por loja).</p>
+          <p class="muted small">Agora os dados ficam no servidor (db.json). Abra este site ao menos 1x ao dia para o débito rodar.</p>
+        </div>
+
+        <div class="meta">
+          <div class="meta__row">
+            <span class="muted">Última execução:</span>
+            <span id="lastRunLabel">—</span>
+          </div>
+          <div class="meta__row">
+            <span class="muted">Próxima execução:</span>
+            <span id="nextRunLabel">—</span>
+          </div>
+          <div class="meta__row">
+            <span class="muted">Agora:</span>
+            <span id="nowLabel">—</span>
+          </div>
+          <div class="meta__row">
+            <span class="muted">Status API (Blob):</span>
+            <span id="apiLabel">—</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="tools">
+        <div class="tools__left">
+          <label class="label" for="importText">Importar/Atualizar lista (cole aqui no seu formato):</label>
+          <textarea id="importText" class="textarea" spellcheck="false" placeholder="Cole a lista aqui..."></textarea>
+
+          <div class="tools__buttons">
+            <button id="importBtn" class="btn btn--primary">Implementar lista de saldo</button>
+            <button id="recalcBtn" class="btn">Executar agora (se ainda não rodou hoje)</button>
+          </div>
+
+          <div id="importMsg" class="msg" aria-live="polite"></div>
+        </div>
+
+        <aside class="tools__right">
+          <div class="card">
+            <h3>Regras</h3>
+            <ul class="muted">
+              <li><strong>SEM SALDO</strong>: saldo vazio / importado como SEM SALDO / saldo insuficiente no débito.</li>
+              <li><strong>ATENÇÃO</strong>: saldo numérico &lt; 100.</li>
+              <li>Orçamento diário e saldo podem ser editados direto na tabela.</li>
+              <li>Valores exibidos em <strong>BRL</strong> (ex: 7.503,12).</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>Dados</h3>
+            <div class="tools__buttons">
+              <button id="exportBtn" class="btn btn--ghost">Exportar JSON</button>
+              <button id="reloadBtn" class="btn btn--ghost">Recarregar do servidor</button>
+              <button id="resetBtn" class="btn btn--danger">Resetar (Blob)</button>
+            </div>
+            <small class="muted">Reset zera o arquivo db.json no servidor.</small>
+          </div>
+        </aside>
+      </section>
+
+      <section class="tableWrap">
+        <table class="table" aria-label="Tabela de saldos e orçamentos">
+          <thead>
+            <tr>
+              <th>LOJA</th>
+              <th class="right">SALDO</th>
+              <th class="right">ORÇAMENTO DIÁRIO</th>
+              <th class="center">STATUS</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </section>
+
+      <footer class="footer muted">
+        <span>Persistência no servidor (db.json). Se você abrir o site em mais de um PC, os dados ficam sincronizados.</span>
+      </footer>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
