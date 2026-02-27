@@ -19,3 +19,7 @@ Persistência usando **Vercel Blob** (arquivo JSON no storage do Vercel).
 
 ## Nota importante
 Este build salva o JSON como **Blob público** (para simplificar a leitura sem precisar de `get()` no SDK). Se você quiser privado com autenticação, eu adapto também.
+
+
+## Fix: dados sumiam no refresh
+Este build salva imediatamente após a importação e também tenta salvar com `keepalive` ao atualizar/fechar a aba.

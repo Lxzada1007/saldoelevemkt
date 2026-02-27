@@ -53,7 +53,13 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "PUT") {
-      const body = req.body;
+      let body = req.body;
+
+      // Vercel Functions às vezes entregam req.body como string
+      if (typeof body === "string") {
+        try { body = JSON.parse(body); } catch (e) { body = null; }
+      }
+
       if (!body || typeof body !== "object") {
         res.status(400).json({ error: "Body inválido" });
         return;

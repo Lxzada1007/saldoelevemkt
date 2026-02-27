@@ -81,6 +81,22 @@ async function apiSave(fullState){
   if(!r.ok) throw new Error(`PUT /api/state ${r.status}`);
 }
 
+async function apiSaveKeepalive(fullState){
+  // tenta salvar mesmo durante refresh/fechamento de aba
+  try{
+    const r = await fetch("/api/state", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fullState),
+      keepalive: true
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+
 function normalizeState(st){
   const out = { stores: [], meta: { lastGlobalRunAt: null } };
   out.meta.lastGlobalRunAt = st?.meta?.lastGlobalRunAt ?? null;
@@ -491,7 +507,9 @@ async function boot(){
       return;
     }
     const { created, updated } = upsertStoresFromImport(items);
-    scheduleSave("import");
+    // salva imediatamente para não perder ao dar refresh
+    try{ await apiSave(state); setApiLabel("OK"); }
+    catch(e){ console.error(e); setApiLabel("ERRO ao salvar"); }
     render();
     setMsg(`Importação concluída: ${updated} atualizadas, ${created} novas.`);
   });
@@ -503,6 +521,11 @@ async function boot(){
 
   document.addEventListener("visibilitychange", () => { if(!document.hidden) runDailyAutomation(); });
   window.addEventListener("focus", runDailyAutomation);
+
+  // tenta salvar pendências ao fechar/atualizar
+  window.addEventListener("beforeunload", () => {
+    try{ apiSaveKeepalive(state); } catch(e) {}
+  });
 
   setInterval(runDailyAutomation, 60_000);
   setInterval(updateMetaLabels, 1_000);
