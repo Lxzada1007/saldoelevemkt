@@ -1,4 +1,4 @@
-import { put, head, get } from "@vercel/blob";
+import { put, head } from "@vercel/blob";
 
 const PATHNAME = "saldo/state.json";
 
@@ -31,11 +31,12 @@ function normalizeState(st) {
 
 async function readStateFromBlob() {
   try {
-    // head accepts url OR pathname and returns metadata (including url)
-    const meta = await head(PATHNAME, { access: "private" });
-    const result = await get(meta.url, { access: "private" });
-    const text = await result.text();
-    return normalizeState(JSON.parse(text));
+    // For PUBLIC blobs we can fetch directly by URL.
+    const meta = await head(PATHNAME);
+    const resp = await fetch(meta.url, { cache: "no-store" });
+    if (!resp.ok) throw new Error(`fetch blob ${resp.status}`);
+    const st = await resp.json();
+    return normalizeState(st);
   } catch (e) {
     // If blob doesn't exist yet, return default
     return defaultState();
@@ -60,9 +61,11 @@ export default async function handler(req, res) {
       const st = normalizeState(body);
       const jsonString = JSON.stringify(st);
 
-      // allowOverwrite needed to keep same pathname for JSON state
+      // IMPORTANT:
+      // - Using PUBLIC access simplifies reads (no SDK get needed, no auth header).
+      // - We overwrite the same pathname.
       await put(PATHNAME, jsonString, {
-        access: "private",
+        access: "public",
         contentType: "application/json",
         allowOverwrite: true,
         cacheControlMaxAge: 0

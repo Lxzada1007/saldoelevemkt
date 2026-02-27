@@ -15,3 +15,7 @@ Persistência usando **Vercel Blob** (arquivo JSON no storage do Vercel).
 ## Observações
 - O Blob é melhor tratado como imutável, mas é possível sobrescrever um JSON (usamos `allowOverwrite: true` e `cacheControlMaxAge: 0`).
 - O arquivo salvo fica em `saldo/state.json` dentro do Blob Store.
+
+
+## Nota importante
+Este build salva o JSON como **Blob público** (para simplificar a leitura sem precisar de `get()` no SDK). Se você quiser privado com autenticação, eu adapto também.

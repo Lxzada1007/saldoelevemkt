@@ -4,11 +4,10 @@ const PATHNAME = "saldo/state.json";
 
 export default async function handler(req, res) {
   try {
-    // If token/store is configured, head may succeed or fail with not found; both mean connectivity ok.
     try {
-      await head(PATHNAME, { access: "private" });
+      await head(PATHNAME);
     } catch (e) {
-      // ignore (not found is fine)
+      // not found is fine
     }
     res.status(200).json({ ok: true });
   } catch (e) {

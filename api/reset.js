@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     }
     const st = { stores: [], meta: { lastGlobalRunAt: null } };
     await put(PATHNAME, JSON.stringify(st), {
-      access: "private",
+      access: "public",
       contentType: "application/json",
       allowOverwrite: true,
       cacheControlMaxAge: 0
