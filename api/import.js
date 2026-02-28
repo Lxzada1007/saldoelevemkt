@@ -51,12 +51,16 @@ export default async function handler(req, res){
         created++;
       }
     }
-
-    await supabase.from("history").insert({
+    try{
+      await supabase.from("history").insert({
       actor: sess.user,
       type: "import",
       payload: { created, updated, totalLines: items.length }
     });
+    } catch(e){
+      console.warn("history insert failed:", e);
+      // Não falha a operação principal
+    }
 
     res.status(200).json({ ok:true, created, updated });
   } catch(e){

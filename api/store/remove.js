@@ -39,14 +39,18 @@ export default async function handler(req, res){
     const { error: dErr } = await supabase
       .from("stores").delete().eq("id", storeId).eq("store_version", storeVersion);
     if(dErr) throw dErr;
-
-    await supabase.from("history").insert({
+    try{
+      await supabase.from("history").insert({
       actor: sess.user,
       type: "store_removed",
       store_id: storeId,
       store_name: current.nome,
       payload: {}
     });
+    } catch(e){
+      console.warn("history insert failed:", e);
+      // Não falha a operação principal
+    }
 
     res.status(200).json({ ok:true });
   } catch(e){

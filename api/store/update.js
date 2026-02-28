@@ -100,14 +100,18 @@ export default async function handler(req, res){
       res.status(409).json({ error:"conflict", serverStore: nowRow ? mapStore(nowRow) : null });
       return;
     }
-
-    await supabase.from("history").insert({
+    try{
+      await supabase.from("history").insert({
       actor: sess.user,
       type,
       store_id: storeId,
       store_name: updated.nome,
       payload
     });
+    } catch(e){
+      console.warn("history insert failed:", e);
+      // Não falha a operação principal
+    }
 
     res.status(200).json({ ok:true, store: mapStore(updated) });
   } catch(e){
