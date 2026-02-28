@@ -1,6 +1,6 @@
 import {
   apiHealth, apiLoadState, apiSaveState, apiSaveStateKeepalive, apiResetAll, apiAppendEvent,
-  updateMetaLabels, setApiLabel, parseMoneyLoose, slugId, newEvent, confirmChange, conflictDialog
+  updateMetaLabels, setApiLabel, parseMoneyLoose, slugId, newEvent, confirmChange, conflictDialog, showLoadingOverlay, hideLoadingOverlay
 } from "./app-core.js";
 
 let state = { stores: [], meta: { lastGlobalRunAt: null } };
@@ -82,8 +82,10 @@ async function boot(){
     }
     const { created, updated } = upsertFromImport(items);
 
+    showLoadingOverlay("Resetando…");
     try{
       setApiLabel("Salvando...");
+      showLoadingOverlay("Aplicando importação…");
       const okConfirm = await confirmChange({
         title: "Confirmar importação",
         lines: [
@@ -94,15 +96,19 @@ async function boot(){
       if(!okConfirm) return;
 
       setApiLabel("Salvando...");
+      showLoadingOverlay("Aplicando importação…");
       try{
         const resp = await apiSaveState(state, state?.meta?.version ?? 0);
         if(resp && typeof resp.version === "number") state.meta.version = resp.version;
+        hideLoadingOverlay();
       } catch(e){
+        hideLoadingOverlay();
         if(e?.code === "CONFLICT"){
           const choice = await conflictDialog();
           if(choice === "reload"){
             state = await apiLoadState();
             updateMetaLabels(state);
+      hideLoadingOverlay();
             setMsg("Conflito detectado. Recarreguei do servidor. Tente importar novamente.");
             return;
           }
@@ -121,6 +127,7 @@ async function boot(){
   });
 
   document.getElementById("reloadBtn").addEventListener("click", async () => {
+    showLoadingOverlay("Recarregando…");
     try{
       state = await apiLoadState();
       setApiLabel("OK");
@@ -130,6 +137,7 @@ async function boot(){
       console.error(e);
       setApiLabel("OFF");
       setMsg("Falha ao recarregar do servidor.");
+      hideLoadingOverlay();
     }
   });
 
@@ -150,10 +158,12 @@ async function boot(){
       updateMetaLabels(state);
       apiAppendEvent(newEvent("reset", { by: "user" }));
       setMsg("Reset concluído.");
+      hideLoadingOverlay();
     } catch(e){
       console.error(e);
       setApiLabel("ERRO");
       setMsg("Falha ao resetar.");
+      hideLoadingOverlay();
     }
   });
 

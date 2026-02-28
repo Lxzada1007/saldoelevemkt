@@ -294,3 +294,71 @@ export function conflictDialog(){
     ]
   });
 }
+
+
+// -------- Loading overlay --------
+let _loadingCount = 0;
+
+function ensureLoadingOverlay(){
+  if(document.getElementById("loadingOverlay")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "loadingOverlay";
+  overlay.style.cssText = `
+    position:fixed; inset:0; z-index:9998;
+    background: rgba(0,0,0,.55);
+    display:none; align-items:center; justify-content:center;
+    padding: 16px;
+    backdrop-filter: blur(6px);
+  `;
+  const box = document.createElement("div");
+  box.style.cssText = `
+    width:min(420px, 100%);
+    background: #121218;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.55);
+    padding: 14px 14px;
+    display:flex; gap:12px; align-items:center;
+  `;
+  const spinner = document.createElement("div");
+  spinner.style.cssText = `
+    width:18px; height:18px;
+    border-radius:999px;
+    border: 2px solid rgba(232,232,238,.25);
+    border-top-color: rgba(59,130,246,.95);
+    animation: spin .9s linear infinite;
+  `;
+  const text = document.createElement("div");
+  text.id = "loadingText";
+  text.style.cssText = "font-size:12px; color:#e8e8ee; font-weight:800; letter-spacing:.2px;";
+  text.textContent = "Salvando…";
+
+  box.appendChild(spinner);
+  box.appendChild(text);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // spinner keyframes
+  if(!document.getElementById("loadingSpinStyles")){
+    const s = document.createElement("style");
+    s.id = "loadingSpinStyles";
+    s.textContent = "@keyframes spin{to{transform:rotate(360deg)}}";
+    document.head.appendChild(s);
+  }
+}
+
+export function showLoadingOverlay(message="Salvando…"){
+  ensureLoadingOverlay();
+  _loadingCount++;
+  const el = document.getElementById("loadingOverlay");
+  const txt = document.getElementById("loadingText");
+  if(txt) txt.textContent = message;
+  if(el) el.style.display = "flex";
+}
+
+export function hideLoadingOverlay(){
+  _loadingCount = Math.max(0, _loadingCount - 1);
+  if(_loadingCount > 0) return;
+  const el = document.getElementById("loadingOverlay");
+  if(el) el.style.display = "none";
+}

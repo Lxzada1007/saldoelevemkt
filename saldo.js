@@ -3,7 +3,7 @@ import {
   updateMetaLabels, setApiLabel,
   parseMoneyLoose, moneyToInputValue,
   statusOf, sortStores, newEvent,
-  confirmChange, conflictDialog
+  confirmChange, conflictDialog, showLoadingOverlay, hideLoadingOverlay
 } from "./app-core.js";
 
 
@@ -45,6 +45,7 @@ function setMsg(text){ /* no msg on this page */ }
 
 async function flushSave(){
   setApiLabel("Salvando...");
+  showLoadingOverlay("Salvando no servidor…");
   if(saving) { pendingSave = true; return; }
   saving = true;
   try{
@@ -63,6 +64,7 @@ async function flushSave(){
       throw e;
     }
   } finally {
+    hideLoadingOverlay();
     saving = false;
     if(pendingSave){ pendingSave = false; flushSave(); }
   }
@@ -145,7 +147,9 @@ function makeEditableInput(store, field){
         return;
       }
 
-      const ok = await confirmChange({
+      let ok = false;
+      try{
+        ok = await confirmChange({
         title: "Confirmar alteração de saldo",
         lines: [
           `Loja: <strong>${store.nome}</strong>`,
@@ -153,6 +157,10 @@ function makeEditableInput(store, field){
           `Para: <strong>${next === null ? "SEM SALDO" : fmt(next)}</strong>`
         ]
       });
+      } catch(e){
+        console.error(e);
+        ok = window.confirm(`Confirmar alteração?`);
+      }
 
       if(!ok){
         input.value = (store.saldo === null ? "SEM SALDO" : moneyToInputValue(store.saldo));
@@ -171,7 +179,9 @@ function makeEditableInput(store, field){
         return;
       }
 
-      const ok = await confirmChange({
+      let ok = false;
+      try{
+        ok = await confirmChange({
         title: "Confirmar alteração de orçamento diário",
         lines: [
           `Loja: <strong>${store.nome}</strong>`,
@@ -179,6 +189,10 @@ function makeEditableInput(store, field){
           `Para: <strong>${fmt(next)}</strong>`
         ]
       });
+      } catch(e){
+        console.error(e);
+        ok = window.confirm(`Confirmar alteração?`);
+      }
 
       if(!ok){
         input.value = moneyToInputValue(store.orcamentoDiario ?? 0);
@@ -219,7 +233,9 @@ async function logIfChangedSaldo(store, oldV, newV){
 }
 
 async function removeStore(store){
-  const ok = await confirmChange({
+  let ok = false;
+  try{
+    ok = await confirmChange({
     title: "Remover loja",
     confirmLabel: "Remover",
     lines: [
@@ -227,6 +243,10 @@ async function removeStore(store){
       `Isso remove da lista (o histórico é mantido).`
     ]
   });
+  } catch(e){
+    console.error(e);
+    ok = window.confirm(`Remover loja?`);
+  }
   if(!ok) return;
 
   state.stores = state.stores.filter(s => s.id !== store.id);
