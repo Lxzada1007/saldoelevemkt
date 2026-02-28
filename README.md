@@ -1,29 +1,35 @@
-# Saldo System (Vercel Blob)
+# Saldo System (3 páginas + Cards mobile + Histórico + Cron)
 
-Persistência usando **Vercel Blob** (arquivo JSON no storage do Vercel).
+## Páginas
+- `index.html` -> Lista de Saldo (somente lista, ordena SEM SALDO/ATENÇÃO/OK, editar e remover)
+- `config.html` -> Configuração (importar lista, recarregar, resetar)
+- `historico.html` -> Histórico (débitos do cron + alterações)
 
-## Configuração no Vercel
-1) Adicione **Blob** ao seu projeto no Dashboard.
-2) Garanta que a env var `BLOB_READ_WRITE_TOKEN` exista (o Vercel cria automaticamente quando o Blob está no mesmo projeto).
+## Persistência
+Vercel Blob:
+- `saldo/state.json`
+- `saldo/history.json`
 
-## Rotas
-- `GET /api/health`
-- `GET /api/state`
-- `PUT /api/state` (salva o JSON no blob `saldo/state.json`)
-- `POST /api/reset` (zera o estado)
+## Cron (Vercel)
+Este projeto inclui `vercel.json` com:
+- `/api/cron/daily` todo dia às 08:00.
+
+### Timezone
+Por padrão usamos `America/Sao_Paulo`. Você pode definir:
+- `CRON_TZ=America/Sao_Paulo`
+
+### Segurança (opcional, recomendado)
+Defina:
+- `CRON_SECRET=uma_senha_qualquer`
+
+E configure o Cron do Vercel para enviar o header:
+- `x-cron-secret: <CRON_SECRET>`
+
+(Se não definir CRON_SECRET, o endpoint aceita sem header.)
+
+## Env vars obrigatórias
+- `BLOB_READ_WRITE_TOKEN` (já configurado no seu projeto)
 
 ## Observações
-- O Blob é melhor tratado como imutável, mas é possível sobrescrever um JSON (usamos `allowOverwrite: true` e `cacheControlMaxAge: 0`).
-- O arquivo salvo fica em `saldo/state.json` dentro do Blob Store.
-
-
-## Nota importante
-Este build salva o JSON como **Blob público** (para simplificar a leitura sem precisar de `get()` no SDK). Se você quiser privado com autenticação, eu adapto também.
-
-
-## Fix: dados sumiam no refresh
-Este build salva imediatamente após a importação e também tenta salvar com `keepalive` ao atualizar/fechar a aba.
-
-
-## Persistência por pathname fixo
-Este build usa `addRandomSuffix: false` + `allowOverwrite: true` para manter sempre o mesmo arquivo `saldo/state.json`.
+- Em mobile, a Lista de Saldo aparece em **cards**.
+- Em desktop, aparece em **tabela**.

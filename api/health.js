@@ -1,16 +1,11 @@
 import { head } from "@vercel/blob";
 
-const PATHNAME = "saldo/state.json";
-
 export default async function handler(req, res) {
-  try {
-    try {
-      await head(PATHNAME);
-    } catch (e) {
-      // not found is fine
-    }
+  try{
+    // If token exists, SDK loads it; head might 404 if not created yet, which is fine.
+    try{ await head("saldo/state.json"); } catch(e){}
     res.status(200).json({ ok: true });
-  } catch (e) {
+  } catch(e){
     res.status(500).json({ ok: false, error: String(e?.message ?? e) });
   }
 }

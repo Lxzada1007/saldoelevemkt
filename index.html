@@ -12,8 +12,12 @@
       <header class="panel__header">
         <div>
           <h1>Lista de Saldo</h1>
-          <p class="muted">Débito automático diário às <strong>08:00</strong> (1x por dia, por loja).</p>
-          <p class="muted small">Agora os dados ficam persistidos no Vercel Blob. Abra este site ao menos 1x ao dia para o débito rodar.</p>
+          <nav class="nav" aria-label="Navegação">
+            <a class="active" href="index.html">Lista de Saldo</a>
+<a class="" href="config.html">Configuração</a>
+<a class="" href="historico.html">Histórico</a>
+          </nav>
+          <p class="muted small">Dados persistidos no Vercel Blob. Débito diário executa via Cron no servidor às <strong>08:00</strong>.</p>
         </div>
 
         <div class="meta">
@@ -30,49 +34,13 @@
             <span id="nowLabel">—</span>
           </div>
           <div class="meta__row">
-            <span class="muted">Status API (Blob):</span>
+            <span class="muted">Status API:</span>
             <span id="apiLabel">—</span>
           </div>
         </div>
       </header>
 
-      <section class="tools">
-        <div class="tools__left">
-          <label class="label" for="importText">Importar/Atualizar lista (cole aqui no seu formato):</label>
-          <textarea id="importText" class="textarea" spellcheck="false" placeholder="Cole a lista aqui..."></textarea>
-
-          <div class="tools__buttons">
-            <button id="importBtn" class="btn btn--primary">Implementar lista de saldo</button>
-            <button id="recalcBtn" class="btn">Executar agora (se ainda não rodou hoje)</button>
-          </div>
-
-          <div id="importMsg" class="msg" aria-live="polite"></div>
-        </div>
-
-        <aside class="tools__right">
-          <div class="card">
-            <h3>Regras</h3>
-            <ul class="muted">
-              <li><strong>SEM SALDO</strong>: saldo vazio / importado como SEM SALDO / saldo insuficiente no débito.</li>
-              <li><strong>ATENÇÃO</strong>: saldo numérico &lt; 100.</li>
-              <li>Orçamento diário e saldo podem ser editados direto na tabela.</li>
-              <li>Valores exibidos em <strong>BRL</strong> (ex: 7.503,12).</li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <h3>Dados</h3>
-            <div class="tools__buttons">
-              <button id="exportBtn" class="btn btn--ghost">Exportar JSON</button>
-              <button id="reloadBtn" class="btn btn--ghost">Recarregar do servidor</button>
-              <button id="resetBtn" class="btn btn--danger">Resetar (Blob)</button>
-            </div>
-            <small class="muted">Reset zera o estado salvo no Blob.</small>
-          </div>
-        </aside>
-      </section>
-
-      <section class="tableWrap">
+      <section class="tableWrap desktopOnly">
         <table class="table" aria-label="Tabela de saldos e orçamentos">
           <thead>
             <tr>
@@ -80,18 +48,21 @@
               <th class="right">SALDO</th>
               <th class="right">ORÇAMENTO DIÁRIO</th>
               <th class="center">STATUS</th>
+              <th class="center">AÇÕES</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
         </table>
       </section>
 
+      <section class="cardsWrap mobileOnly" id="cards"></section>
+
       <footer class="footer muted">
-        <span>Persistência no Blob (Vercel). Se você abrir o site em mais de um PC, os dados ficam sincronizados.</span>
+        <span>Ordenação automática: <strong>SEM SALDO</strong> → <strong>ATENÇÃO</strong> → <strong>OK</strong>. Edição direta salva no servidor e registra no histórico.</span>
       </footer>
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <script type="module" src="saldo.js"></script>
 </body>
 </html>

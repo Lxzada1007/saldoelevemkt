@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Histórico</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel">
+      <header class="panel__header">
+        <div>
+          <h1>Histórico</h1>
+          <nav class="nav" aria-label="Navegação">
+            <a class="" href="index.html">Lista de Saldo</a>
+<a class="" href="config.html">Configuração</a>
+<a class="active" href="historico.html">Histórico</a>
+          </nav>
+          <p class="muted small">Dados persistidos no Vercel Blob. Débito diário executa via Cron no servidor às <strong>08:00</strong>.</p>
+        </div>
+
+        <div class="meta">
+          <div class="meta__row">
+            <span class="muted">Última execução:</span>
+            <span id="lastRunLabel">—</span>
+          </div>
+          <div class="meta__row">
+            <span class="muted">Próxima execução:</span>
+            <span id="nextRunLabel">—</span>
+          </div>
+          <div class="meta__row">
+            <span class="muted">Agora:</span>
+            <span id="nowLabel">—</span>
+          </div>
+          <div class="meta__row">
+            <span class="muted">Status API:</span>
+            <span id="apiLabel">—</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="tools">
+        <div class="tools__left">
+          <div class="card">
+            <h3>Filtros</h3>
+            <div class="tools__buttons">
+              <select id="filterType" class="cellInput" style="text-align:left; width: 240px;">
+                <option value="">Todos os tipos</option>
+                <option value="debit">Débito diário</option>
+                <option value="budget_change">Mudança de orçamento</option>
+                <option value="saldo_change">Mudança de saldo</option>
+                <option value="import">Importação</option>
+                <option value="store_removed">Remoção de loja</option>
+                <option value="reset">Reset</option>
+              </select>
+
+              <select id="filterStore" class="cellInput" style="text-align:left; width: 240px;">
+                <option value="">Todas as lojas</option>
+              </select>
+
+              <button id="refreshHistoryBtn" class="btn btn--ghost">Atualizar</button>
+            </div>
+            <small class="muted">Mais recente no topo.</small>
+          </div>
+        </div>
+
+        <aside class="tools__right">
+          <div class="card">
+            <h3>Info</h3>
+            <p class="muted small" style="margin:0;">
+              O histórico registra: débitos do cron, alterações manuais de saldo/orçamento, importações e remoções.
+            </p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="cardsWrap" id="historyList"></section>
+
+      <footer class="footer muted">
+        <span>Se o histórico ficar muito grande, podemos particionar por mês automaticamente.</span>
+      </footer>
+    </section>
+  </main>
+
+  <script type="module" src="historico.js"></script>
+</body>
+</html>
