@@ -87,7 +87,6 @@ async function boot(){
 
   const { created, updated } = upsertFromImport(items);
 
-  showLoadingOverlay("Confirmando importação…");
   try{
     const okConfirm = await confirmChange({
       title: "Confirmar importação",

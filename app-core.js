@@ -395,7 +395,7 @@ function ensureLoadingOverlay(){
 
 export function showLoadingOverlay(message="Salvando…"){
   ensureLoadingOverlay();
-  _loadingCount++;
+  if(_loadingCount===0){ _loadingCount++; } else { /* já visível */ }
   const el = document.getElementById("loadingOverlay");
   const txt = document.getElementById("loadingText");
   if(txt) txt.textContent = message;
