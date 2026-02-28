@@ -428,3 +428,14 @@ export async function requireAuth(){
   }
   return me;
 }
+
+
+// Segurança: se alguma exceção escapar, fecha o overlay para não "travar" a tela.
+if(typeof window !== "undefined"){
+  window.addEventListener("error", () => {
+    try{ hideLoadingOverlay(); } catch {}
+  });
+  window.addEventListener("unhandledrejection", () => {
+    try{ hideLoadingOverlay(); } catch {}
+  });
+}

@@ -106,10 +106,21 @@ async function boot(){
       setApiLabel("Salvando...");
       showLoadingOverlay("Aplicando importação…");
       try{
-        const resp = await apiSaveState(state, state?.meta?.version ?? 0);
+        const resp = await apiApplyImport(items, state?.meta?.version ?? 0);
         if(resp && typeof resp.version === "number") state.meta.version = resp.version;
+
+        // Recarrega para refletir ids/versões do servidor
+        state = await apiLoadState();
+        updateMetaLabels(state);
+
+        setApiLabel("OK");
+        const u = (resp?.updated ?? updated);
+        const c = (resp?.created ?? created);
+        setMsg(`Importação concluída: ${u} atualizadas, ${c} novas.`);
       } catch(e){
         if(e?.code === "CONFLICT"){
+          // fecha overlay antes do modal para não travar
+          hideLoadingOverlay();
           const choice = await conflictDialog();
           if(choice === "reload"){
             state = await apiLoadState();
@@ -117,20 +128,13 @@ async function boot(){
             setMsg("Conflito detectado. Recarreguei do servidor. Tente importar novamente.");
             return;
           }
+          // se não recarregar, só aborta a importação
+          setMsg("Conflito detectado. Importação não aplicada.");
+          return;
         }
         throw e;
       }
-
-      setApiLabel("OK");
-            setMsg(`Importação concluída: ${updated} atualizadas, ${created} novas.`);
-    } catch(e){
-      console.error(e);
-      setApiLabel("ERRO ao salvar");
-      setMsg("Falha ao salvar no servidor.");
-    } finally {
-      hideLoadingOverlay();
-    }
-  });
+});
 
   document.getElementById("reloadBtn").addEventListener("click", async () => {
     showLoadingOverlay("Recarregando…");
