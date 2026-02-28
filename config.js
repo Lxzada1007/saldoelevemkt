@@ -78,65 +78,73 @@ async function boot(){
   updateMetaLabels(state);
 
   document.getElementById("importBtn").addEventListener("click", async () => {
-    const text = document.getElementById("importText").value;
-    const items = parseImportedList(text);
-    if(items.length === 0){
-      setMsg("Nada para importar. Cole sua lista no campo acima.");
+  const text = document.getElementById("importText").value;
+  const items = parseImportedList(text);
+  if(items.length === 0){
+    setMsg("Nada para importar. Cole sua lista no campo acima.");
+    return;
+  }
+
+  const { created, updated } = upsertFromImport(items);
+
+  showLoadingOverlay("Confirmando importação…");
+  try{
+    const okConfirm = await confirmChange({
+      title: "Confirmar importação",
+      lines: [
+        `Você vai aplicar a importação no servidor.`,
+        `Atualizadas: <strong>${updated}</strong> | Novas: <strong>${created}</strong>`
+      ]
+    });
+
+    if(!okConfirm){
+      setMsg("Importação cancelada.");
       return;
     }
-    const { created, updated } = upsertFromImport(items);
 
-    // Importação é crítica: confirma e só depois aplica no servidor.
-    // Overlay trava a UI e sempre é fechado no finally.
-    showLoadingOverlay("Confirmando importação…");
+    setApiLabel("Salvando...");
+    showLoadingOverlay("Aplicando importação…");
+
     try{
-      const okConfirm = await confirmChange({
-        title: "Confirmar importação",
-        lines: [
-          `Você vai aplicar a importação no servidor.`,
-          `Atualizadas: <strong>${updated}</strong> | Novas: <strong>${created}</strong>`
-        ]
-      });
+      const resp = await apiApplyImport(items, state && state.meta ? (state.meta.version || 0) : 0);
+      if(resp && typeof resp.version === "number" && state && state.meta) state.meta.version = resp.version;
 
-      if(!okConfirm){
-        setMsg("Importação cancelada.");
-        return;
-      }
+      // Recarrega para refletir ids/versões do servidor
+      state = await apiLoadState();
+      updateMetaLabels(state);
 
-      setApiLabel("Salvando...");
-      showLoadingOverlay("Aplicando importação…");
-      try{
-        const resp = await apiApplyImport(items, state?.meta?.version ?? 0);
-        if(resp && typeof resp.version === "number") state.meta.version = resp.version;
-
-        // Recarrega para refletir ids/versões do servidor
-        state = await apiLoadState();
-        updateMetaLabels(state);
-
-        setApiLabel("OK");
-        const u = (resp?.updated ?? updated);
-        const c = (resp?.created ?? created);
-        setMsg(`Importação concluída: ${u} atualizadas, ${c} novas.`);
-      } catch(e){
-        if(e?.code === "CONFLICT"){
-          // fecha overlay antes do modal para não travar
-          hideLoadingOverlay();
-          const choice = await conflictDialog();
-          if(choice === "reload"){
-            state = await apiLoadState();
-            updateMetaLabels(state);
-            setMsg("Conflito detectado. Recarreguei do servidor. Tente importar novamente.");
-            return;
-          }
-          // se não recarregar, só aborta a importação
-          setMsg("Conflito detectado. Importação não aplicada.");
+      setApiLabel("OK");
+      const u = (resp && typeof resp.updated === "number") ? resp.updated : updated;
+      const c = (resp && typeof resp.created === "number") ? resp.created : created;
+      setMsg(`Importação concluída: ${u} atualizadas, ${c} novas.`);
+    } catch(e){
+      if(e && e.code === "CONFLICT"){
+        // fecha overlay antes do modal para não travar
+        hideLoadingOverlay();
+        const choice = await conflictDialog();
+        if(choice === "reload"){
+          state = await apiLoadState();
+          updateMetaLabels(state);
+          setMsg("Conflito detectado. Recarreguei do servidor. Tente importar novamente.");
           return;
         }
-        throw e;
+        setMsg("Conflito detectado. Importação não aplicada.");
+        return;
       }
+      console.error(e);
+      setApiLabel("ERRO");
+      setMsg("Falha ao aplicar importação.");
+    }
+  } catch(e){
+    console.error(e);
+    setApiLabel("ERRO");
+    setMsg("Falha inesperada na importação.");
+  } finally {
+    hideLoadingOverlay();
+  }
 });
 
-  document.getElementById("reloadBtn").addEventListener("click", async () => {
+document.getElementById("reloadBtn").addEventListener("click", async () => {
     showLoadingOverlay("Recarregando…");
     try{
       state = await apiLoadState();
