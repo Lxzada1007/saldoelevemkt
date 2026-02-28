@@ -427,3 +427,23 @@ export function hideLoadingOverlay(){
   const el = document.getElementById("loadingOverlay");
   if(el) el.style.display = "none";
 }
+
+
+export async function apiMe(){
+  const r = await fetch("/api/me", { cache:"no-store" });
+  if(!r.ok) return { ok:false };
+  return await r.json().catch(()=>({ ok:false }));
+}
+
+export async function apiLogout(){
+  await fetch("/api/logout", { method:"POST" }).catch(()=>{});
+}
+
+export async function requireAuth(){
+  const me = await apiMe();
+  if(!me?.ok){
+    location.href = "login.html";
+    return null;
+  }
+  return me;
+}

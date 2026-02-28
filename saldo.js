@@ -4,7 +4,7 @@ import {
   parseMoneyLoose, moneyToInputValue,
   statusOf, sortStores, newEvent,
   confirmChange, conflictDialog, showLoadingOverlay, hideLoadingOverlay
-} from "./app-core.js";
+, requireAuth, apiLogout } from "./app-core.js";
 
 
 function fmt(v){
@@ -25,15 +25,24 @@ async function patchWithConflict(actionName, fn){
   } catch(e){
     console.error(e);
     if(e?.code === "CONFLICT"){
-      setApiLabel("CONFLITO");
-      const choice = await conflictDialog();
-      if(choice === "reload"){
-        try{
-          state = await apiLoadState();
-          render();
-        } catch(err){ console.error(err); }
+      // Auto-resolve: recarrega e tenta novamente UMA vez
+      try{
+        showLoadingOverlay("Resolvendo conflito…");
+        state = await apiLoadState();
+        render();
+        const resp2 = await fn(state?.meta?.version ?? 0);
+        if(resp2 && typeof resp2.version === "number") state.meta.version = resp2.version;
+        setApiLabel("OK");
+        return { ok:true, resp: resp2, retried:true };
+      } catch(e2){
+        console.error(e2);
+        setApiLabel("CONFLITO");
+        const choice = await conflictDialog();
+        if(choice === "reload"){
+          try{ state = await apiLoadState(); render(); } catch(err){ console.error(err); }
+        }
+        return { ok:false, conflict:true };
       }
-      return { ok:false, conflict:true };
     }
     setApiLabel("ERRO ao salvar");
     return { ok:false, error:true };
@@ -154,7 +163,6 @@ function makeEditableInput(store, field){
       const result = await patchWithConflict("Salvando saldo…", (baseV) => apiUpdateStoreField({ storeId: store.id, field: "saldo", value: next }, baseV));
       if(result.ok){
         store.saldo = next;
-        logIfChangedSaldo(store, old, store.saldo);
       }
     } else {
       const old = store.orcamentoDiario ?? 0;
@@ -188,7 +196,6 @@ function makeEditableInput(store, field){
       const result = await patchWithConflict("Salvando orçamento…", (baseV) => apiUpdateStoreField({ storeId: store.id, field: "orcamentoDiario", value: next }, baseV));
       if(result.ok){
         store.orcamentoDiario = next;
-        logIfChangedBudget(store, old, next);
       }
     }
     render();
@@ -240,8 +247,7 @@ async function removeStore(store){
   const result = await patchWithConflict("Removendo…", (baseV) => apiRemoveStore(store.id, baseV));
   if(result.ok){
     state.stores = state.stores.filter(s => s.id !== store.id);
-    try{ apiAppendEvent(newEvent("store_removed", { storeId: store.id, storeName: store.nome })); } catch(e){ console.error(e); }
-  }
+      }
   render();
 }
 
@@ -395,6 +401,10 @@ function render(){
 }
 
 async function boot(){
+  const me = await requireAuth();
+  if(!me) return;
+  document.getElementById('userLabel').textContent = me.user;
+  document.getElementById('logoutBtn').addEventListener('click', async ()=>{ await apiLogout(); location.href='login.html'; });
   try{
     const ok = await apiHealth();
     setApiLabel(ok ? "OK" : "OFF");

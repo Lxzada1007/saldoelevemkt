@@ -1,7 +1,7 @@
 import {
   apiHealth, apiLoadState, apiApplyImport, apiResetAll, apiAppendEvent,
   updateMetaLabels, setApiLabel, parseMoneyLoose, slugId, newEvent, confirmChange, conflictDialog, showLoadingOverlay, hideLoadingOverlay
-} from "./app-core.js";
+, requireAuth, apiLogout } from "./app-core.js";
 
 let state = { stores: [], meta: { lastGlobalRunAt: null } };
 
@@ -60,6 +60,10 @@ function upsertFromImport(items){
 }
 
 async function boot(){
+  const me = await requireAuth();
+  if(!me) return;
+  document.getElementById('userLabel').textContent = me.user;
+  document.getElementById('logoutBtn').addEventListener('click', async ()=>{ await apiLogout(); location.href='login.html'; });
   try{
     const ok = await apiHealth();
     setApiLabel(ok ? "OK" : "OFF");
@@ -118,8 +122,7 @@ async function boot(){
       }
 
       setApiLabel("OK");
-      apiAppendEvent(newEvent("import", { created, updated, totalLines: items.length }));
-      setMsg(`Importação concluída: ${updated} atualizadas, ${created} novas.`);
+            setMsg(`Importação concluída: ${updated} atualizadas, ${created} novas.`);
     } catch(e){
       console.error(e);
       setApiLabel("ERRO ao salvar");

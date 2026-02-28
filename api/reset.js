@@ -1,6 +1,9 @@
 import { put } from "@vercel/blob";
+import { requireAuth } from "./_auth.js";
 
 export default async function handler(req, res){
+  const sess = requireAuth(req, res);
+  if(!sess) return;
   try{
     if(req.method !== "POST"){
       res.setHeader("Allow", "POST");

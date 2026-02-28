@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel" style="max-width:520px;">
+      <header class="panel__header">
+        <div>
+          <h1>Login</h1>
+          <p class="muted small">Acesso restrito. Use um dos usuários: <strong>Lucas</strong> ou <strong>Mateus</strong>. Senha: <strong>admin</strong>.</p>
+        </div>
+      </header>
+
+      <section class="tools" style="grid-template-columns:1fr;">
+        <div class="card">
+          <label class="label" for="user">Usuário</label>
+          <select id="user" class="cellInput" style="text-align:left; width:100%;">
+            <option value="Lucas">Lucas</option>
+            <option value="Mateus">Mateus</option>
+          </select>
+
+          <div style="height:10px;"></div>
+
+          <label class="label" for="pass">Senha</label>
+          <input id="pass" class="cellInput" type="password" style="width:100%; text-align:left;" value="admin" />
+
+          <div style="height:12px;"></div>
+
+          <label style="display:flex; gap:10px; align-items:center; font-size:12px; color: var(--muted);">
+            <input id="remember" type="checkbox" />
+            Permanecer logado
+          </label>
+
+          <div class="tools__buttons" style="margin-top:14px;">
+            <button id="loginBtn" class="btn btn--primary" style="width:100%;">Entrar</button>
+          </div>
+
+          <div id="msg" class="msg" aria-live="polite"></div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="login.js?v=1772240900"></script>
+</body>
+</html>

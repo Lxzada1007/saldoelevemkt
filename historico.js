@@ -1,7 +1,7 @@
 import {
   apiHealth, apiLoadState, apiLoadHistory,
   updateMetaLabels, setApiLabel
-} from "./app-core.js";
+, requireAuth, apiLogout } from "./app-core.js";
 
 let state = { stores: [], meta: { lastGlobalRunAt: null } };
 let history = { events: [] };
@@ -82,6 +82,7 @@ function render(){
     const p = ev.payload || {};
     let lines = [];
 
+    if(ev.actor) lines.push(`Por: <strong>${escapeHtml(ev.actor)}</strong>`);
     if(p.storeName) lines.push(`Loja: <strong>${escapeHtml(p.storeName)}</strong>`);
     if(ev.type === "debit"){
       lines.push(`Data: ${escapeHtml(p.dateKey || "")}`);
@@ -139,6 +140,10 @@ async function reload(){
 }
 
 async function boot(){
+  const me = await requireAuth();
+  if(!me) return;
+  document.getElementById('userLabel').textContent = me.user;
+  document.getElementById('logoutBtn').addEventListener('click', async ()=>{ await apiLogout(); location.href='login.html'; });
   try{
     const ok = await apiHealth();
     setApiLabel(ok ? "OK" : "OFF");

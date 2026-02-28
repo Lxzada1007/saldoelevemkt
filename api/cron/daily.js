@@ -60,10 +60,11 @@ function dateKeyInTZ(date, timeZone){
   return `${y}-${m}-${d}`;
 }
 
-function newEvent(type, payload){
+function newEvent(type, actor, payload){
   return {
     id: Math.random().toString(16).slice(2) + "-" + Date.now(),
     type,
+    actor,
     ts: new Date().toISOString(),
     payload
   };
@@ -115,7 +116,7 @@ export default async function handler(req, res){
       s.ultimaExecucao = todayKey;
       changed++;
 
-      history.events.push(newEvent("debit", {
+      history.events.push(newEvent("debit", "cron", {
         dateKey: todayKey,
         storeId: s.id,
         storeName: s.nome,

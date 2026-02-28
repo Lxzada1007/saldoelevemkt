@@ -321,7 +321,6 @@ h1{
 @media (min-width: 820px){
   .desktopOnly{ display:block; }
   .mobileOnly{ display:none; }
-  .cardsWrap{ display:none; }
 }
 
 /* Fix header alignment */

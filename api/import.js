@@ -1,6 +1,8 @@
 import { put, head } from "@vercel/blob";
+import { requireAuth } from "./_auth.js";
 
 const PATHNAME = "saldo/state.json";
+const HISTORY_PATH = "saldo/history.json";
 
 function defaultState(){ return { stores: [], meta: { lastGlobalRunAt: null, version: 0 } }; }
 
@@ -25,6 +27,26 @@ async function readState(){
   }
 }
 
+async function readHistory(){
+  try{
+    const meta = await head(HISTORY_PATH);
+    const resp = await fetch(meta.url, { cache:"no-store" });
+    if(!resp.ok) throw new Error("fetch");
+    const data = await resp.json();
+    if(!data || typeof data !== "object" || !Array.isArray(data.events)) return { events: [] };
+    return data;
+  } catch { return { events: [] }; }
+}
+function newEvent(type, actor, payload){
+  return { id: Math.random().toString(16).slice(2) + "-" + Date.now(), type, actor, ts: new Date().toISOString(), payload };
+}
+async function appendEvent(ev){
+  const h = await readHistory();
+  h.events.push(ev);
+  if(h.events.length > 5000) h.events = h.events.slice(h.events.length - 5000);
+  await put(HISTORY_PATH, JSON.stringify(h), { access:"public", contentType:"application/json", allowOverwrite:true, addRandomSuffix:false, cacheControlMaxAge:0 });
+}
+
 function slugId(name){
   return name
     .toLowerCase()
@@ -36,6 +58,9 @@ function slugId(name){
 
 export default async function handler(req, res){
   try{
+    const sess = requireAuth(req, res);
+    if(!sess) return;
+
     if(req.method !== "POST"){
       res.setHeader("Allow","POST");
       res.status(405).json({ error:"Method Not Allowed" });
@@ -99,6 +124,8 @@ export default async function handler(req, res){
       addRandomSuffix:false,
       cacheControlMaxAge:0
     });
+
+    await appendEvent(newEvent("import", sess.user, { created, updated, totalLines: items.length }));
 
     res.status(200).json({ ok:true, version: state.meta.version, created, updated });
   } catch(e){

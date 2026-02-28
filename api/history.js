@@ -1,4 +1,5 @@
 import { put, head } from "@vercel/blob";
+import { requireAuth } from "./_auth.js";
 
 const PATHNAME = "saldo/history.json";
 
@@ -20,6 +21,8 @@ async function readHistory(){
 }
 
 export default async function handler(req, res){
+  const sess = requireAuth(req, res);
+  if(!sess) return;
   try{
     if(req.method !== "GET"){
       res.setHeader("Allow", "GET");

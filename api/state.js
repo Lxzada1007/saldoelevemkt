@@ -1,4 +1,5 @@
 import { put, head } from "@vercel/blob";
+import { requireAuth } from "./_auth.js";
 
 const PATHNAME = "saldo/state.json";
 
@@ -41,6 +42,8 @@ async function readState(){
 }
 
 export default async function handler(req, res){
+  const sess = requireAuth(req, res);
+  if(!sess) return;
   try{
     if(req.method === "GET"){
       const st = await readState();
