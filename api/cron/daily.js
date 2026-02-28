@@ -12,13 +12,14 @@ function checkSecret(req){
   return got === secret;
 }
 
-function defaultState(){ return { stores: [], meta: { lastGlobalRunAt: null } }; }
+function defaultState(){ return { stores: [], meta: { lastGlobalRunAt: null, version: 0 } }; }
 function defaultHistory(){ return { events: [] }; }
 
 function normalizeState(st){
   const out = defaultState();
   if(st && typeof st === "object"){
     out.meta.lastGlobalRunAt = st?.meta?.lastGlobalRunAt ?? null;
+    out.meta.version = Number.isFinite(Number(st?.meta?.version)) ? Number(st.meta.version) : 0;
     if(Array.isArray(st.stores)){
       out.stores = st.stores.map(s => ({
         id: String(s?.id ?? "").trim() || String(s?.nome ?? "").toLowerCase().replace(/\s+/g,"-").slice(0,60),
@@ -127,6 +128,7 @@ export default async function handler(req, res){
 
     if(changed > 0){
       state.meta.lastGlobalRunAt = now.toISOString();
+      state.meta.version = (Number(state.meta.version)||0) + 1;
       await put(STATE_PATH, JSON.stringify(state), {
         access: "public",
         contentType: "application/json",

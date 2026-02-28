@@ -56,8 +56,9 @@ export function moneyToInputValue(n){
 }
 
 export function normalizeState(st){
-  const out = { stores: [], meta: { lastGlobalRunAt: null } };
+  const out = { stores: [], meta: { lastGlobalRunAt: null, version: 0 } };
   out.meta.lastGlobalRunAt = st?.meta?.lastGlobalRunAt ?? null;
+  out.meta.version = Number.isFinite(Number(st?.meta?.version)) ? Number(st.meta.version) : 0;
 
   const arr = Array.isArray(st?.stores) ? st.stores : [];
   out.stores = arr.map(s => ({
@@ -106,22 +107,43 @@ export async function apiLoadState(){
   return normalizeState(st);
 }
 
-export async function apiSaveState(state){
+export async function apiSaveState(state, baseVersion=null){
+  const headers = { "Content-Type": "application/json" };
+  if(baseVersion !== null && baseVersion !== undefined){
+    headers["x-base-version"] = String(baseVersion);
+  }
   const r = await fetch("/api/state", {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(state)
   });
+  if(r.status === 409){
+    const detail = await r.json().catch(()=>({}));
+    const err = new Error("CONFLICT");
+    err.code = "CONFLICT";
+    err.detail = detail;
+    throw err;
+  }
   if(!r.ok) throw new Error(`PUT /api/state ${r.status}`);
+  return await r.json().catch(()=>({ ok:true }));
 }
-export async function apiSaveStateKeepalive(state){
-  // tenta salvar mesmo durante refresh/fechamento (keepalive)
+export async function apiSaveStateKeepalive(state, baseVersion=null){
+  const headers = { "Content-Type": "application/json" };
+  if(baseVersion !== null && baseVersion !== undefined){
+    headers["x-base-version"] = String(baseVersion);
+  }
   const r = await fetch("/api/state", {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(state),
     keepalive: true
   });
+  // keepalive não garante leitura da resposta; mas tentamos detectar conflito
+  if(r.status === 409){
+    const err = new Error("CONFLICT");
+    err.code = "CONFLICT";
+    throw err;
+  }
   if(!r.ok) throw new Error(`PUT /api/state ${r.status}`);
 }
 
@@ -168,4 +190,107 @@ export function newEvent(type, payload){
     ts: new Date().toISOString(),
     payload
   };
+}
+
+
+// -------- Modal (confirmações) --------
+function ensureModalStyles(){
+  if(document.getElementById("modalStyles")) return;
+  const s = document.createElement("style");
+  s.id = "modalStyles";
+  s.textContent = `
+  .modalOverlay{ position:fixed; inset:0; background: rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:16px; z-index:9999;}
+  .modalBox{ width:min(520px, 100%); background: #121218; border:1px solid rgba(255,255,255,.08); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.55); overflow:hidden;}
+  .modalHead{ padding:14px 14px 10px; border-bottom:1px solid rgba(255,255,255,.08);}
+  .modalTitle{ margin:0; font-size:14px; letter-spacing:.2px;}
+  .modalBody{ padding:12px 14px; color:#a9a9b3; font-size:12px; line-height:1.6;}
+  .modalBody strong{ color:#e8e8ee; }
+  .modalBtns{ padding:12px 14px 14px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; border-top:1px solid rgba(255,255,255,.08);}
+  `;
+  document.head.appendChild(s);
+}
+
+export function modalDialog({ title="Confirmar", messageHtml="", buttons=[{label:"Cancelar", value:false},{label:"Confirmar", value:true, variant:"primary"}] }){
+  ensureModalStyles();
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "modalOverlay";
+    overlay.addEventListener("click", (e)=>{ if(e.target === overlay) close(buttons[0]?.value ?? false); });
+
+    const box = document.createElement("div");
+    box.className = "modalBox";
+
+    const head = document.createElement("div");
+    head.className = "modalHead";
+    const h = document.createElement("h3");
+    h.className = "modalTitle";
+    h.textContent = title;
+    head.appendChild(h);
+
+    const body = document.createElement("div");
+    body.className = "modalBody";
+    body.innerHTML = messageHtml || "";
+
+    const btns = document.createElement("div");
+    btns.className = "modalBtns";
+
+    const close = (val) => {
+      document.removeEventListener("keydown", onKey);
+      overlay.remove();
+      resolve(val);
+    };
+
+    const onKey = (ev) => {
+      if(ev.key === "Escape") close(buttons[0]?.value ?? false);
+      if(ev.key === "Enter") {
+        const primary = buttons.find(b => b.variant === "primary") || buttons[buttons.length-1];
+        close(primary?.value ?? true);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+
+    for(const b of buttons){
+      const btn = document.createElement("button");
+      btn.className = "btn";
+      if(b.variant === "primary") btn.classList.add("btn--primary");
+      if(b.variant === "danger") btn.classList.add("btn--danger");
+      btn.textContent = b.label;
+      btn.addEventListener("click", ()=> close(b.value));
+      btns.appendChild(btn);
+    }
+
+    box.appendChild(head);
+    box.appendChild(body);
+    box.appendChild(btns);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // focus first button
+    const firstBtn = btns.querySelector("button");
+    if(firstBtn) firstBtn.focus();
+  });
+}
+
+export function confirmChange({title, lines, confirmLabel="Confirmar"}){
+  const html = (lines || []).map(l => `<div>${l}</div>`).join("");
+  return modalDialog({
+    title,
+    messageHtml: html,
+    buttons: [
+      {label:"Cancelar", value:false},
+      {label:confirmLabel, value:true, variant:"primary"}
+    ]
+  });
+}
+
+export function conflictDialog(){
+  return modalDialog({
+    title: "Conflito detectado",
+    messageHtml: `<div>Os dados no servidor foram alterados por outra aba/usuário.</div>
+<div><strong>Recarregar do servidor</strong> para evitar sobrescrever.</div>`,
+    buttons: [
+      {label:"Cancelar", value:"cancel"},
+      {label:"Recarregar do servidor", value:"reload", variant:"primary"}
+    ]
+  });
 }

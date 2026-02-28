@@ -8,7 +8,7 @@ export default async function handler(req, res){
       return;
     }
 
-    const emptyState = { stores: [], meta: { lastGlobalRunAt: null } };
+    const emptyState = { stores: [], meta: { lastGlobalRunAt: null, version: 0 } };
     const emptyHistory = { events: [] };
 
     await put("saldo/state.json", JSON.stringify(emptyState), {

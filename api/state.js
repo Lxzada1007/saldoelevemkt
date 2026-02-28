@@ -3,13 +3,14 @@ import { put, head } from "@vercel/blob";
 const PATHNAME = "saldo/state.json";
 
 function defaultState(){
-  return { stores: [], meta: { lastGlobalRunAt: null } };
+  return { stores: [], meta: { lastGlobalRunAt: null, version: 0 } };
 }
 
 function normalizeState(st){
   const out = defaultState();
   if(st && typeof st === "object"){
     out.meta.lastGlobalRunAt = st?.meta?.lastGlobalRunAt ?? null;
+    out.meta.version = Number.isFinite(Number(st?.meta?.version)) ? Number(st.meta.version) : 0;
     if(Array.isArray(st.stores)){
       out.stores = st.stores.map(s => ({
         id: String(s?.id ?? "").trim() || String(s?.nome ?? "").toLowerCase().replace(/\s+/g,"-").slice(0,60),
@@ -58,6 +59,24 @@ export default async function handler(req, res){
         return;
       }
       const st = normalizeState(body);
+
+      // Optimistic locking: evita sobrescrever quando outra aba/usuário salvou antes
+      const baseHeader = req.headers["x-base-version"] || req.headers["X-Base-Version"]; 
+      if(baseHeader !== undefined && baseHeader !== null){
+        const baseVersion = Number(baseHeader);
+        const current = await readState();
+        const currentV = Number(current?.meta?.version) || 0;
+        if(Number.isFinite(baseVersion) && baseVersion !== currentV){
+          res.status(409).json({ error: "conflict", serverVersion: currentV });
+          return;
+        }
+      }
+
+      // bump version on each successful write
+      const current2 = await readState();
+      const currentV2 = Number(current2?.meta?.version) || 0;
+      st.meta.version = currentV2 + 1;
+
       await put(PATHNAME, JSON.stringify(st), {
         access: "public",
         contentType: "application/json",
@@ -65,7 +84,7 @@ export default async function handler(req, res){
         addRandomSuffix: false,
         cacheControlMaxAge: 0
       });
-      res.status(200).json({ ok: true });
+      res.status(200).json({ ok: true, version: st.meta.version });
       return;
     }
 

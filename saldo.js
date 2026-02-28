@@ -1,9 +1,41 @@
 import {
   apiHealth, apiLoadState, apiSaveState, apiSaveStateKeepalive, apiAppendEvent,
   updateMetaLabels, setApiLabel,
-  parseMoneyLoose, moneyToInputValue, slugId,
-  statusOf, sortStores, newEvent
+  parseMoneyLoose, moneyToInputValue,
+  statusOf, sortStores, newEvent,
+  confirmChange, conflictDialog
 } from "./app-core.js";
+
+
+function fmt(v){
+  if(v === null || v === undefined) return "SEM SALDO";
+  const n = Number(v);
+  if(!Number.isFinite(n)) return "SEM SALDO";
+  return new Intl.NumberFormat("pt-BR", { style:"currency", currency:"BRL" }).format(n);
+}
+
+async function saveWithConflictHandling(){
+  try{
+    await flushSave();
+    return true;
+  } catch(e){
+    // flushSave já marca apiLabel; mas aqui tratamos conflito com dialog
+    if(e?.code === "CONFLICT"){
+      const choice = await conflictDialog();
+      if(choice === "reload"){
+        try{
+          state = await apiLoadState();
+          render();
+          return false;
+        } catch(err){
+          console.error(err);
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+}
 
 let state = { stores: [], meta: { lastGlobalRunAt: null } };
 let saving = false;
@@ -16,11 +48,20 @@ async function flushSave(){
   if(saving) { pendingSave = true; return; }
   saving = true;
   try{
-    await apiSaveState(state);
+    const baseV = state?.meta?.version ?? 0;
+    const resp = await apiSaveState(state, baseV);
+    if(resp && typeof resp.version === "number") state.meta.version = resp.version;
     setApiLabel("OK");
+    return true;
   } catch(e){
     console.error(e);
-    setApiLabel("ERRO ao salvar");
+    if(e?.code === "CONFLICT"){
+      setApiLabel("CONFLITO");
+      throw e;
+    } else {
+      setApiLabel("ERRO ao salvar");
+      throw e;
+    }
   } finally {
     saving = false;
     if(pendingSave){ pendingSave = false; flushSave(); }
@@ -94,15 +135,59 @@ function makeEditableInput(store, field){
 
     if(isSaldo){
       const old = store.saldo;
-      store.saldo = (parsed.kind === "null") ? null : parsed.value;
-      await flushSave();
-      await logIfChangedSaldo(store, old, store.saldo);
+      const next = (parsed.kind === "null") ? null : parsed.value;
+
+      // nada mudou
+      const a = (old === null) ? null : Number(old);
+      const b = (next === null) ? null : Number(next);
+      if(a === b){
+        input.value = (store.saldo === null ? "SEM SALDO" : moneyToInputValue(store.saldo));
+        return;
+      }
+
+      const ok = await confirmChange({
+        title: "Confirmar alteração de saldo",
+        lines: [
+          `Loja: <strong>${store.nome}</strong>`,
+          `De: <strong>${old === null ? "SEM SALDO" : fmt(old)}</strong>`,
+          `Para: <strong>${next === null ? "SEM SALDO" : fmt(next)}</strong>`
+        ]
+      });
+
+      if(!ok){
+        input.value = (store.saldo === null ? "SEM SALDO" : moneyToInputValue(store.saldo));
+        return;
+      }
+
+      store.saldo = next;
+      const saved = await saveWithConflictHandling();
+      if(saved) logIfChangedSaldo(store, old, store.saldo);
     } else {
       const old = store.orcamentoDiario ?? 0;
-      const v = (parsed.kind === "null") ? 0 : parsed.value;
-      store.orcamentoDiario = v;
-      await flushSave();
-      await logIfChangedBudget(store, old, v);
+      const next = (parsed.kind === "null") ? 0 : parsed.value;
+
+      if(Number(old) === Number(next)){
+        input.value = moneyToInputValue(store.orcamentoDiario ?? 0);
+        return;
+      }
+
+      const ok = await confirmChange({
+        title: "Confirmar alteração de orçamento diário",
+        lines: [
+          `Loja: <strong>${store.nome}</strong>`,
+          `De: <strong>${fmt(old)}</strong>`,
+          `Para: <strong>${fmt(next)}</strong>`
+        ]
+      });
+
+      if(!ok){
+        input.value = moneyToInputValue(store.orcamentoDiario ?? 0);
+        return;
+      }
+
+      store.orcamentoDiario = next;
+      const saved = await saveWithConflictHandling();
+      if(saved) logIfChangedBudget(store, old, next);
     }
     render();
   });
@@ -134,13 +219,21 @@ async function logIfChangedSaldo(store, oldV, newV){
 }
 
 async function removeStore(store){
-  const ok = confirm(`Remover a loja "${store.nome}"?`);
+  const ok = await confirmChange({
+    title: "Remover loja",
+    confirmLabel: "Remover",
+    lines: [
+      `Tem certeza que deseja remover <strong>${store.nome}</strong>?`,
+      `Isso remove da lista (o histórico é mantido).`
+    ]
+  });
   if(!ok) return;
+
   state.stores = state.stores.filter(s => s.id !== store.id);
-  await flushSave();
-  try{
-    apiAppendEvent(newEvent("store_removed", { storeId: store.id, storeName: store.nome }));
-  } catch(e){ console.error(e); }
+  const saved = await saveWithConflictHandling();
+  if(saved){
+    try{ apiAppendEvent(newEvent("store_removed", { storeId: store.id, storeName: store.nome })); } catch(e){ console.error(e); }
+  }
   render();
 }
 
@@ -309,7 +402,7 @@ async function boot(){
 
   // garante persistência mesmo se recarregar logo após editar
   window.addEventListener("beforeunload", () => {
-    try{ apiSaveStateKeepalive(state); } catch(e) {}
+    try{ apiSaveStateKeepalive(state, state?.meta?.version ?? 0); } catch(e) {}
   });
 
   setInterval(() => updateMetaLabels(state), 1000);

@@ -1,6 +1,6 @@
 import {
   apiHealth, apiLoadState, apiSaveState, apiSaveStateKeepalive, apiResetAll, apiAppendEvent,
-  updateMetaLabels, setApiLabel, parseMoneyLoose, slugId, newEvent
+  updateMetaLabels, setApiLabel, parseMoneyLoose, slugId, newEvent, confirmChange, conflictDialog
 } from "./app-core.js";
 
 let state = { stores: [], meta: { lastGlobalRunAt: null } };
@@ -84,7 +84,32 @@ async function boot(){
 
     try{
       setApiLabel("Salvando...");
-      await apiSaveState(state);
+      const okConfirm = await confirmChange({
+        title: "Confirmar importação",
+        lines: [
+          `Você vai aplicar a importação no servidor.`,
+          `Atualizadas: <strong>${updated}</strong> | Novas: <strong>${created}</strong>`
+        ]
+      });
+      if(!okConfirm) return;
+
+      setApiLabel("Salvando...");
+      try{
+        const resp = await apiSaveState(state, state?.meta?.version ?? 0);
+        if(resp && typeof resp.version === "number") state.meta.version = resp.version;
+      } catch(e){
+        if(e?.code === "CONFLICT"){
+          const choice = await conflictDialog();
+          if(choice === "reload"){
+            state = await apiLoadState();
+            updateMetaLabels(state);
+            setMsg("Conflito detectado. Recarreguei do servidor. Tente importar novamente.");
+            return;
+          }
+        }
+        throw e;
+      }
+
       setApiLabel("OK");
       apiAppendEvent(newEvent("import", { created, updated, totalLines: items.length }));
       setMsg(`Importação concluída: ${updated} atualizadas, ${created} novas.`);
@@ -109,7 +134,14 @@ async function boot(){
   });
 
   document.getElementById("resetBtn").addEventListener("click", async () => {
-    const ok = confirm("Tem certeza? Isso vai apagar ESTADO e HISTÓRICO.");
+    const ok = await confirmChange({
+      title: "Resetar Blob",
+      confirmLabel: "Resetar",
+      lines: [
+        "Tem certeza?",
+        "<strong>Isso vai apagar ESTADO e HISTÓRICO.</strong>"
+      ]
+    });
     if(!ok) return;
     try{
       await apiResetAll();
@@ -126,7 +158,7 @@ async function boot(){
   });
 
   window.addEventListener("beforeunload", () => {
-    try{ apiSaveStateKeepalive(state); } catch(e) {}
+    try{ apiSaveStateKeepalive(state, state?.meta?.version ?? 0); } catch(e) {}
   });
 
   setInterval(() => updateMetaLabels(state), 1000);
