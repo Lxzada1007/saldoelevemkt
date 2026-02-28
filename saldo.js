@@ -1,5 +1,5 @@
 import {
-  apiHealth, apiLoadState, apiSaveState, apiSaveStateKeepalive, apiAppendEvent,
+  apiHealth, apiLoadState, apiUpdateStoreField, apiRemoveStore, apiAppendEvent,
   updateMetaLabels, setApiLabel,
   parseMoneyLoose, moneyToInputValue,
   statusOf, sortStores, newEvent,
@@ -14,61 +14,40 @@ function fmt(v){
   return new Intl.NumberFormat("pt-BR", { style:"currency", currency:"BRL" }).format(n);
 }
 
-async function saveWithConflictHandling(){
+async function patchWithConflict(actionName, fn){
+  showLoadingOverlay(actionName);
   try{
-    await flushSave();
-    return true;
+    const baseV = state?.meta?.version ?? 0;
+    const resp = await fn(baseV);
+    if(resp && typeof resp.version === "number") state.meta.version = resp.version;
+    setApiLabel("OK");
+    return { ok:true, resp };
   } catch(e){
-    // flushSave já marca apiLabel; mas aqui tratamos conflito com dialog
+    console.error(e);
     if(e?.code === "CONFLICT"){
+      setApiLabel("CONFLITO");
       const choice = await conflictDialog();
       if(choice === "reload"){
         try{
           state = await apiLoadState();
           render();
-          return false;
-        } catch(err){
-          console.error(err);
-          return false;
-        }
+        } catch(err){ console.error(err); }
       }
+      return { ok:false, conflict:true };
     }
-    return false;
+    setApiLabel("ERRO ao salvar");
+    return { ok:false, error:true };
+  } finally {
+    hideLoadingOverlay();
   }
 }
+
 
 let state = { stores: [], meta: { lastGlobalRunAt: null } };
 let saving = false;
 let pendingSave = false;
 
 function setMsg(text){ /* no msg on this page */ }
-
-async function flushSave(){
-  setApiLabel("Salvando...");
-  showLoadingOverlay("Salvando no servidor…");
-  if(saving) { pendingSave = true; return; }
-  saving = true;
-  try{
-    const baseV = state?.meta?.version ?? 0;
-    const resp = await apiSaveState(state, baseV);
-    if(resp && typeof resp.version === "number") state.meta.version = resp.version;
-    setApiLabel("OK");
-    return true;
-  } catch(e){
-    console.error(e);
-    if(e?.code === "CONFLICT"){
-      setApiLabel("CONFLITO");
-      throw e;
-    } else {
-      setApiLabel("ERRO ao salvar");
-      throw e;
-    }
-  } finally {
-    hideLoadingOverlay();
-    saving = false;
-    if(pendingSave){ pendingSave = false; flushSave(); }
-  }
-}
 
 function badgeHTML(store){
   const st = statusOf(store);
@@ -172,9 +151,11 @@ function makeEditableInput(store, field){
         return;
       }
 
-      store.saldo = next;
-      const saved = await saveWithConflictHandling();
-      if(saved) logIfChangedSaldo(store, old, store.saldo);
+      const result = await patchWithConflict("Salvando saldo…", (baseV) => apiUpdateStoreField({ storeId: store.id, field: "saldo", value: next }, baseV));
+      if(result.ok){
+        store.saldo = next;
+        logIfChangedSaldo(store, old, store.saldo);
+      }
     } else {
       const old = store.orcamentoDiario ?? 0;
       const next = (parsed.kind === "null") ? 0 : parsed.value;
@@ -204,9 +185,11 @@ function makeEditableInput(store, field){
         return;
       }
 
-      store.orcamentoDiario = next;
-      const saved = await saveWithConflictHandling();
-      if(saved) logIfChangedBudget(store, old, next);
+      const result = await patchWithConflict("Salvando orçamento…", (baseV) => apiUpdateStoreField({ storeId: store.id, field: "orcamentoDiario", value: next }, baseV));
+      if(result.ok){
+        store.orcamentoDiario = next;
+        logIfChangedBudget(store, old, next);
+      }
     }
     render();
   });
@@ -254,9 +237,9 @@ async function removeStore(store){
   }
   if(!ok) return;
 
-  state.stores = state.stores.filter(s => s.id !== store.id);
-  const saved = await saveWithConflictHandling();
-  if(saved){
+  const result = await patchWithConflict("Removendo…", (baseV) => apiRemoveStore(store.id, baseV));
+  if(result.ok){
+    state.stores = state.stores.filter(s => s.id !== store.id);
     try{ apiAppendEvent(newEvent("store_removed", { storeId: store.id, storeName: store.nome })); } catch(e){ console.error(e); }
   }
   render();
@@ -425,10 +408,6 @@ async function boot(){
   }
   render();
 
-  // garante persistência mesmo se recarregar logo após editar
-  window.addEventListener("beforeunload", () => {
-    try{ apiSaveStateKeepalive(state, state?.meta?.version ?? 0); } catch(e) {}
-  });
 
   setInterval(() => updateMetaLabels(state), 1000);
 }

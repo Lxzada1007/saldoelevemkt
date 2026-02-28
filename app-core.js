@@ -95,6 +95,70 @@ export function sortStores(stores){
 }
 
 // -------- API helpers --------
+
+export async function apiUpdateStoreField({ storeId, field, value }, baseVersion=null){
+  const headers = { "Content-Type": "application/json" };
+  if(baseVersion !== null && baseVersion !== undefined){
+    headers["x-base-version"] = String(baseVersion);
+  }
+  const r = await fetch("/api/store/update", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ storeId, field, value })
+  });
+  if(r.status === 409){
+    const detail = await r.json().catch(()=>({}));
+    const err = new Error("CONFLICT");
+    err.code = "CONFLICT";
+    err.detail = detail;
+    throw err;
+  }
+  if(!r.ok) throw new Error(`POST /api/store/update ${r.status}`);
+  return await r.json();
+}
+
+export async function apiRemoveStore(storeId, baseVersion=null){
+  const headers = { "Content-Type": "application/json" };
+  if(baseVersion !== null && baseVersion !== undefined){
+    headers["x-base-version"] = String(baseVersion);
+  }
+  const r = await fetch("/api/store/remove", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ storeId })
+  });
+  if(r.status === 409){
+    const detail = await r.json().catch(()=>({}));
+    const err = new Error("CONFLICT");
+    err.code = "CONFLICT";
+    err.detail = detail;
+    throw err;
+  }
+  if(!r.ok) throw new Error(`POST /api/store/remove ${r.status}`);
+  return await r.json();
+}
+
+export async function apiApplyImport(items, baseVersion=null){
+  const headers = { "Content-Type": "application/json" };
+  if(baseVersion !== null && baseVersion !== undefined){
+    headers["x-base-version"] = String(baseVersion);
+  }
+  const r = await fetch("/api/import", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ items })
+  });
+  if(r.status === 409){
+    const detail = await r.json().catch(()=>({}));
+    const err = new Error("CONFLICT");
+    err.code = "CONFLICT";
+    err.detail = detail;
+    throw err;
+  }
+  if(!r.ok) throw new Error(`POST /api/import ${r.status}`);
+  return await r.json();
+}
+
 export async function apiHealth(){
   const r = await fetch("/api/health", { cache: "no-store" });
   return r.ok;
