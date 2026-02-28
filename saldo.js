@@ -25,6 +25,11 @@ async function patchWithConflict(actionName, fn){
   } catch(e){
     console.error(e);
 
+    if(e?.code === "UNAUTH"){
+      window.location.href = "/login.html";
+      return { ok:false, unauth:true };
+    }
+
     if(e?.code === "CONFLICT"){
       // 1) tenta resolver automaticamente uma única vez: recarrega e tenta novamente
       try{
@@ -50,6 +55,7 @@ async function patchWithConflict(actionName, fn){
     }
 
     setApiLabel("ERRO ao salvar");
+    if(e && e.message) setMsg(String(e.message));
     return { ok:false, error:true };
   } finally {
     // garante que o overlay fecha mesmo se tiver modal

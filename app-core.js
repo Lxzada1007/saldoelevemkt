@@ -102,15 +102,42 @@ export async function apiUpdateStoreField({ storeId, field, value, storeVersion 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ storeId, field, value, storeVersion })
   });
+
+  // tenta ler resposta (json ou texto) para mensagens melhores
+  let detail = null;
+  let rawText = "";
+  try{
+    rawText = await r.text();
+    try{ detail = rawText ? JSON.parse(rawText) : null; } catch(e){ detail = null; }
+  } catch(e){
+    // ignore
+  }
+
+  if(r.status === 401){
+    const err = new Error("UNAUTH");
+    err.code = "UNAUTH";
+    err.detail = detail || { error: rawText || "Não autenticado" };
+    throw err;
+  }
+
   if(r.status === 409){
-    const detail = await r.json().catch(()=>({}));
     const err = new Error("CONFLICT");
     err.code = "CONFLICT";
+    err.detail = detail || {};
+    throw err;
+  }
+
+  if(!r.ok){
+    const msg = (detail && (detail.error || detail.message)) ? (detail.error || detail.message) : (rawText || `HTTP ${r.status}`);
+    const err = new Error(msg);
+    err.code = "HTTP_ERROR";
+    err.status = r.status;
     err.detail = detail;
     throw err;
   }
-  if(!r.ok) throw new Error(`POST /api/store/update ${r.status}`);
-  return await r.json();
+
+  // sucesso
+  return detail || (rawText ? JSON.parse(rawText) : {});
 }
 
 export async function apiRemoveStore(storeId, storeVersion){
