@@ -114,6 +114,17 @@ export async function apiSaveState(state){
   });
   if(!r.ok) throw new Error(`PUT /api/state ${r.status}`);
 }
+export async function apiSaveStateKeepalive(state){
+  // tenta salvar mesmo durante refresh/fechamento (keepalive)
+  const r = await fetch("/api/state", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(state),
+    keepalive: true
+  });
+  if(!r.ok) throw new Error(`PUT /api/state ${r.status}`);
+}
+
 
 export async function apiResetAll(){
   const r = await fetch("/api/reset", { method: "POST" });

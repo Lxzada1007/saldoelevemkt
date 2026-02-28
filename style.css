@@ -323,3 +323,7 @@ h1{
   .mobileOnly{ display:none; }
   .cardsWrap{ display:none; }
 }
+
+/* Fix header alignment */
+.table thead th.right{ text-align:right; }
+.table thead th.center{ text-align:center; }

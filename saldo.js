@@ -1,5 +1,5 @@
 import {
-  apiHealth, apiLoadState, apiSaveState, apiAppendEvent,
+  apiHealth, apiLoadState, apiSaveState, apiSaveStateKeepalive, apiAppendEvent,
   updateMetaLabels, setApiLabel,
   parseMoneyLoose, moneyToInputValue, slugId,
   statusOf, sortStores, newEvent
@@ -12,6 +12,7 @@ let pendingSave = false;
 function setMsg(text){ /* no msg on this page */ }
 
 async function flushSave(){
+  setApiLabel("Salvando...");
   if(saving) { pendingSave = true; return; }
   saving = true;
   try{
@@ -112,7 +113,7 @@ function makeEditableInput(store, field){
 async function logIfChangedBudget(store, oldV, newV){
   if(Number(oldV) === Number(newV)) return;
   try{
-    await apiAppendEvent(newEvent("budget_change", {
+    apiAppendEvent(newEvent("budget_change", {
       storeId: store.id, storeName: store.nome,
       from: oldV, to: newV
     }));
@@ -124,7 +125,7 @@ async function logIfChangedSaldo(store, oldV, newV){
   const b = (newV === null) ? null : Number(newV);
   if(a === b) return;
   try{
-    await apiAppendEvent(newEvent("saldo_change", {
+    apiAppendEvent(newEvent("saldo_change", {
       storeId: store.id, storeName: store.nome,
       from: oldV, to: newV,
       source: "manual"
@@ -138,7 +139,7 @@ async function removeStore(store){
   state.stores = state.stores.filter(s => s.id !== store.id);
   await flushSave();
   try{
-    await apiAppendEvent(newEvent("store_removed", { storeId: store.id, storeName: store.nome }));
+    apiAppendEvent(newEvent("store_removed", { storeId: store.id, storeName: store.nome }));
   } catch(e){ console.error(e); }
   render();
 }
@@ -305,6 +306,12 @@ async function boot(){
     state = { stores: [], meta: { lastGlobalRunAt: null } };
   }
   render();
+
+  // garante persistência mesmo se recarregar logo após editar
+  window.addEventListener("beforeunload", () => {
+    try{ apiSaveStateKeepalive(state); } catch(e) {}
+  });
+
   setInterval(() => updateMetaLabels(state), 1000);
 }
 

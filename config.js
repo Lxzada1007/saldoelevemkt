@@ -1,5 +1,5 @@
 import {
-  apiHealth, apiLoadState, apiSaveState, apiResetAll, apiAppendEvent,
+  apiHealth, apiLoadState, apiSaveState, apiSaveStateKeepalive, apiResetAll, apiAppendEvent,
   updateMetaLabels, setApiLabel, parseMoneyLoose, slugId, newEvent
 } from "./app-core.js";
 
@@ -83,9 +83,10 @@ async function boot(){
     const { created, updated } = upsertFromImport(items);
 
     try{
+      setApiLabel("Salvando...");
       await apiSaveState(state);
       setApiLabel("OK");
-      await apiAppendEvent(newEvent("import", { created, updated, totalLines: items.length }));
+      apiAppendEvent(newEvent("import", { created, updated, totalLines: items.length }));
       setMsg(`Importação concluída: ${updated} atualizadas, ${created} novas.`);
     } catch(e){
       console.error(e);
@@ -115,13 +116,17 @@ async function boot(){
       setApiLabel("OK");
       state = { stores: [], meta: { lastGlobalRunAt: null } };
       updateMetaLabels(state);
-      await apiAppendEvent(newEvent("reset", { by: "user" }));
+      apiAppendEvent(newEvent("reset", { by: "user" }));
       setMsg("Reset concluído.");
     } catch(e){
       console.error(e);
       setApiLabel("ERRO");
       setMsg("Falha ao resetar.");
     }
+  });
+
+  window.addEventListener("beforeunload", () => {
+    try{ apiSaveStateKeepalive(state); } catch(e) {}
   });
 
   setInterval(() => updateMetaLabels(state), 1000);
