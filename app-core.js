@@ -67,6 +67,8 @@ export function normalizeState(st){
     saldo: (s.saldo === null || s.saldo === undefined) ? null : safeNumber(Number(s.saldo)),
     orcamentoDiario: safeNumber(Number(s.orcamentoDiario)) ?? 0,
     ultimaExecucao: s.ultimaExecucao || null,
+    storeVersion: Number.isFinite(Number(s.storeVersion)) ? Number(s.storeVersion)
+                : (Number.isFinite(Number(s.store_version)) ? Number(s.store_version) : 0),
     ativa: (s.ativa === false) ? false : true
   })).filter(s => s.nome);
   return out;
