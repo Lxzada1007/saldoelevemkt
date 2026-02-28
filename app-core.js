@@ -433,9 +433,9 @@ export async function requireAuth(){
 // Segurança: se alguma exceção escapar, fecha o overlay para não "travar" a tela.
 if(typeof window !== "undefined"){
   window.addEventListener("error", () => {
-    try{ hideLoadingOverlay(); } catch {}
+    try{ hideLoadingOverlay(); } catch(e) {}
   });
   window.addEventListener("unhandledrejection", () => {
-    try{ hideLoadingOverlay(); } catch {}
+    try{ hideLoadingOverlay(); } catch(e) {}
   });
 }

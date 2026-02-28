@@ -12,7 +12,7 @@ async function boot(){
       const me = await r.json();
       if(me?.ok) location.href = "index.html";
     }
-  } catch {}
+  } catch(e) {}
 
   document.getElementById("loginBtn").addEventListener("click", async () => {
     const user = (document.getElementById("user").value || "").trim();
