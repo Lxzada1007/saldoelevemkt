@@ -122,7 +122,12 @@ function makeEditableInput(store, field){
         : moneyToInputValue(store.orcamentoDiario ?? 0);
       input.blur();
     }
-    if(ev.key === "Enter"){ input.blur(); }
+    if(ev.key === "Enter"){
+      ev.preventDefault();
+      ev.stopPropagation();
+      // blur dispara a confirmação
+      input.blur();
+    }
   });
 
   input.addEventListener("blur", async () => {

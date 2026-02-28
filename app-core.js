@@ -247,7 +247,8 @@ export function modalDialog({ title="Confirmar", messageHtml="", buttons=[{label
         close(primary?.value ?? true);
       }
     };
-    document.addEventListener("keydown", onKey);
+    // Anexa o listener no próximo tick para não capturar o Enter que causou o blur
+    setTimeout(() => document.addEventListener("keydown", onKey), 0);
 
     for(const b of buttons){
       const btn = document.createElement("button");
