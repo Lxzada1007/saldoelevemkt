@@ -1,51 +1,5 @@
-import { put, head } from "@vercel/blob";
 import { requireAuth } from "../_auth.js";
-
-const PATHNAME = "saldo/state.json";
-const HISTORY_PATH = "saldo/history.json";
-
-function defaultState(){ return { stores: [], meta: { lastGlobalRunAt: null, version: 0 } }; }
-
-function normalizeState(st){
-  const out = defaultState();
-  if(st && typeof st === "object"){
-    out.meta.lastGlobalRunAt = st?.meta?.lastGlobalRunAt ?? null;
-    out.meta.version = Number.isFinite(Number(st?.meta?.version)) ? Number(st.meta.version) : 0;
-    out.stores = Array.isArray(st.stores) ? st.stores : [];
-  }
-  return out;
-}
-
-async function readState(){
-  try{
-    const meta = await head(PATHNAME);
-    const resp = await fetch(meta.url, { cache: "no-store" });
-    if(!resp.ok) throw new Error(`fetch blob ${resp.status}`);
-    return normalizeState(await resp.json());
-  } catch(e){
-    return defaultState();
-  }
-}
-
-async function readHistory(){
-  try{
-    const meta = await head(HISTORY_PATH);
-    const resp = await fetch(meta.url, { cache:"no-store" });
-    if(!resp.ok) throw new Error("fetch");
-    const data = await resp.json();
-    if(!data || typeof data !== "object" || !Array.isArray(data.events)) return { events: [] };
-    return data;
-  } catch { return { events: [] }; }
-}
-function newEvent(type, actor, payload){
-  return { id: Math.random().toString(16).slice(2) + "-" + Date.now(), type, actor, ts: new Date().toISOString(), payload };
-}
-async function appendEvent(ev){
-  const h = await readHistory();
-  h.events.push(ev);
-  if(h.events.length > 5000) h.events = h.events.slice(h.events.length - 5000);
-  await put(HISTORY_PATH, JSON.stringify(h), { access:"public", contentType:"application/json", allowOverwrite:true, addRandomSuffix:false, cacheControlMaxAge:0 });
-}
+import { supabaseAdmin } from "../_supabase.js";
 
 export default async function handler(req, res){
   try{
@@ -60,45 +14,43 @@ export default async function handler(req, res){
 
     let body = req.body;
     if(typeof body === "string"){ try{ body = JSON.parse(body); } catch{ body = null; } }
+
     const storeId = String(body?.storeId || "").trim();
-    if(!storeId){
+    const storeVersion = Number(body?.storeVersion ?? NaN);
+
+    if(!storeId || !Number.isFinite(storeVersion)){
       res.status(400).json({ error:"Body inválido" });
       return;
     }
 
-    const baseHeader = req.headers["x-base-version"] || req.headers["X-Base-Version"];
-    const baseVersion = (baseHeader === undefined) ? null : Number(baseHeader);
+    const supabase = supabaseAdmin();
 
-    const state = await readState();
-    const currentV = Number(state?.meta?.version) || 0;
+    const { data: current, error: cErr } = await supabase
+      .from("stores").select("*").eq("id", storeId).single();
+    if(cErr) throw cErr;
 
-    if(baseVersion !== null && Number.isFinite(baseVersion) && baseVersion !== currentV){
-      res.status(409).json({ error:"conflict", serverVersion: currentV });
+    if(Number(current.store_version) !== storeVersion){
+      res.status(409).json({ error:"conflict", serverStore: {
+        id: current.id, nome: current.nome, saldo: current.saldo, orcamentoDiario: current.orcamento_diario, ultimaExecucao: current.ultima_execucao, storeVersion: current.store_version
+      }});
       return;
     }
 
-    const store = state.stores.find(s => String(s?.id) === storeId);
-    if(!store){
-      res.status(400).json({ error:"Loja não encontrada" });
-      return;
-    }
+    const { error: dErr } = await supabase
+      .from("stores").delete().eq("id", storeId).eq("store_version", storeVersion);
+    if(dErr) throw dErr;
 
-    state.stores = state.stores.filter(s => String(s?.id) !== storeId);
-    state.meta.version = currentV + 1;
-
-    await put(PATHNAME, JSON.stringify(state), {
-      access:"public",
-      contentType:"application/json",
-      allowOverwrite:true,
-      addRandomSuffix:false,
-      cacheControlMaxAge:0
+    await supabase.from("history").insert({
+      actor: sess.user,
+      type: "store_removed",
+      store_id: storeId,
+      store_name: current.nome,
+      payload: {}
     });
 
-    await appendEvent(newEvent("store_removed", sess.user, { storeId, storeName: store.nome }));
-
-    res.status(200).json({ ok:true, version: state.meta.version });
+    res.status(200).json({ ok:true });
   } catch(e){
     console.error("API /api/store/remove error:", e);
-    res.status(500).json({ error:String(e?.message ?? e) });
+    res.status(500).json({ error: String(e?.message ?? e) });
   }
 }

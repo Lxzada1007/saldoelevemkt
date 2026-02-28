@@ -96,15 +96,11 @@ export function sortStores(stores){
 
 // -------- API helpers --------
 
-export async function apiUpdateStoreField({ storeId, field, value }, baseVersion=null){
-  const headers = { "Content-Type": "application/json" };
-  if(baseVersion !== null && baseVersion !== undefined){
-    headers["x-base-version"] = String(baseVersion);
-  }
+export async function apiUpdateStoreField({ storeId, field, value, storeVersion }){
   const r = await fetch("/api/store/update", {
     method: "POST",
-    headers,
-    body: JSON.stringify({ storeId, field, value })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ storeId, field, value, storeVersion })
   });
   if(r.status === 409){
     const detail = await r.json().catch(()=>({}));
@@ -117,15 +113,11 @@ export async function apiUpdateStoreField({ storeId, field, value }, baseVersion
   return await r.json();
 }
 
-export async function apiRemoveStore(storeId, baseVersion=null){
-  const headers = { "Content-Type": "application/json" };
-  if(baseVersion !== null && baseVersion !== undefined){
-    headers["x-base-version"] = String(baseVersion);
-  }
+export async function apiRemoveStore(storeId, storeVersion){
   const r = await fetch("/api/store/remove", {
     method: "POST",
-    headers,
-    body: JSON.stringify({ storeId })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ storeId, storeVersion })
   });
   if(r.status === 409){
     const detail = await r.json().catch(()=>({}));
@@ -138,23 +130,12 @@ export async function apiRemoveStore(storeId, baseVersion=null){
   return await r.json();
 }
 
-export async function apiApplyImport(items, baseVersion=null){
-  const headers = { "Content-Type": "application/json" };
-  if(baseVersion !== null && baseVersion !== undefined){
-    headers["x-base-version"] = String(baseVersion);
-  }
+export async function apiApplyImport(items){
   const r = await fetch("/api/import", {
     method: "POST",
-    headers,
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ items })
   });
-  if(r.status === 409){
-    const detail = await r.json().catch(()=>({}));
-    const err = new Error("CONFLICT");
-    err.code = "CONFLICT";
-    err.detail = detail;
-    throw err;
-  }
   if(!r.ok) throw new Error(`POST /api/import ${r.status}`);
   return await r.json();
 }

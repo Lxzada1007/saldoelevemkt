@@ -1,91 +1,15 @@
-import { put, head } from "@vercel/blob";
 import { requireAuth } from "../_auth.js";
+import { supabaseAdmin } from "../_supabase.js";
 
-const PATHNAME = "saldo/state.json";
-const HISTORY_PATH = "saldo/history.json";
-
-function defaultState(){ return { stores: [], meta: { lastGlobalRunAt: null, version: 0 } }; }
-
-function normalizeState(st){
-  const out = defaultState();
-  if(st && typeof st === "object"){
-    out.meta.lastGlobalRunAt = st?.meta?.lastGlobalRunAt ?? null;
-    out.meta.version = Number.isFinite(Number(st?.meta?.version)) ? Number(st.meta.version) : 0;
-
-    if(Array.isArray(st.stores)){
-      out.stores = st.stores.map(s => ({
-        id: String(s?.id ?? "").trim() || String(s?.nome ?? "").toLowerCase().replace(/\s+/g,"-").slice(0,60),
-        nome: String(s?.nome ?? "").trim(),
-        saldo: (s?.saldo === null || s?.saldo === undefined) ? null : Number(s.saldo),
-        orcamentoDiario: Number(s?.orcamentoDiario ?? 0),
-        ultimaExecucao: s?.ultimaExecucao ? String(s.ultimaExecucao) : null,
-        ativa: s?.ativa === false ? false : true
-      })).filter(s => s.nome).map(s => ({
-        ...s,
-        saldo: Number.isFinite(s.saldo) ? s.saldo : null,
-        orcamentoDiario: (Number.isFinite(s.orcamentoDiario) && s.orcamentoDiario >= 0) ? s.orcamentoDiario : 0
-      }));
-    }
-  }
-  return out;
-}
-
-async function readState(){
-  try{
-    const meta = await head(PATHNAME);
-    const resp = await fetch(meta.url, { cache: "no-store" });
-    if(!resp.ok) throw new Error(`fetch blob ${resp.status}`);
-    return normalizeState(await resp.json());
-  } catch(e){
-    return defaultState();
-  }
-}
-
-async function readHistory(){
-  try{
-    const meta = await head(HISTORY_PATH);
-    const resp = await fetch(meta.url, { cache:"no-store" });
-    if(!resp.ok) throw new Error("fetch");
-    const data = await resp.json();
-    if(!data || typeof data !== "object" || !Array.isArray(data.events)) return { events: [] };
-    return data;
-  } catch { return { events: [] }; }
-}
-function newEvent(type, actor, payload){
-  return { id: Math.random().toString(16).slice(2) + "-" + Date.now(), type, actor, ts: new Date().toISOString(), payload };
-}
-async function appendEvent(ev){
-  const h = await readHistory();
-  h.events.push(ev);
-  if(h.events.length > 5000) h.events = h.events.slice(h.events.length - 5000);
-  await put(HISTORY_PATH, JSON.stringify(h), { access:"public", contentType:"application/json", allowOverwrite:true, addRandomSuffix:false, cacheControlMaxAge:0 });
-}
-
-function applyUpdate(state, storeId, field, value){
-  const idx = state.stores.findIndex(s => s.id === storeId);
-  if(idx === -1) return { ok:false, error:"Loja não encontrada" };
-  const s = state.stores[idx];
-
-  const before = (field === "saldo") ? s.saldo : s.orcamentoDiario;
-
-  if(field === "saldo"){
-    if(value === null || value === undefined){
-      s.saldo = null;
-    } else {
-      const n = Number(value);
-      if(!Number.isFinite(n) || n < 0) return { ok:false, error:"Saldo inválido" };
-      s.saldo = Number(n.toFixed(2));
-    }
-  } else if(field === "orcamentoDiario"){
-    const n = Number(value);
-    if(!Number.isFinite(n) || n < 0) return { ok:false, error:"Orçamento inválido" };
-    s.orcamentoDiario = Number(n.toFixed(2));
-  } else {
-    return { ok:false, error:"Campo inválido" };
-  }
-
-  const after = (field === "saldo") ? s.saldo : s.orcamentoDiario;
-  return { ok:true, store: s, before, after };
+function mapStore(row){
+  return {
+    id: row.id,
+    nome: row.nome,
+    saldo: row.saldo === null ? null : Number(row.saldo),
+    orcamentoDiario: Number(row.orcamento_diario ?? 0),
+    ultimaExecucao: row.ultima_execucao,
+    storeVersion: Number(row.store_version ?? 0)
+  };
 }
 
 export default async function handler(req, res){
@@ -101,53 +25,93 @@ export default async function handler(req, res){
 
     let body = req.body;
     if(typeof body === "string"){ try{ body = JSON.parse(body); } catch{ body = null; } }
+
     const storeId = String(body?.storeId || "").trim();
     const field = String(body?.field || "").trim();
     const value = body?.value;
+    const storeVersion = Number(body?.storeVersion ?? NaN);
 
-    if(!storeId || !field){
+    if(!storeId || !field || !Number.isFinite(storeVersion)){
       res.status(400).json({ error:"Body inválido" });
       return;
     }
 
-    const baseHeader = req.headers["x-base-version"] || req.headers["X-Base-Version"];
-    const baseVersion = (baseHeader === undefined) ? null : Number(baseHeader);
+    const supabase = supabaseAdmin();
 
-    const state = await readState();
-    const currentV = Number(state?.meta?.version) || 0;
+    // Carrega estado atual da loja para log e conflito
+    const { data: current, error: cErr } = await supabase
+      .from("stores")
+      .select("*")
+      .eq("id", storeId)
+      .single();
+    if(cErr) throw cErr;
 
-    if(baseVersion !== null && Number.isFinite(baseVersion) && baseVersion !== currentV){
-      res.status(409).json({ error:"conflict", serverVersion: currentV });
+    if(Number(current.store_version) !== storeVersion){
+      res.status(409).json({ error:"conflict", serverStore: mapStore(current) });
       return;
     }
 
-    const applied = applyUpdate(state, storeId, field, value);
-    if(!applied.ok){
-      res.status(400).json(applied);
+    let patch = { store_version: storeVersion + 1 };
+    let type = "";
+    let payload = { from: null, to: null };
+
+    if(field === "saldo"){
+      type = "saldo_change";
+      payload.from = current.saldo === null ? null : Number(current.saldo);
+      if(value === null || value === undefined || value === ""){
+        patch.saldo = null;
+        payload.to = null;
+      } else {
+        const n = Number(value);
+        if(!Number.isFinite(n) || n < 0){
+          res.status(400).json({ error:"Saldo inválido" });
+          return;
+        }
+        patch.saldo = Number(n.toFixed(2));
+        payload.to = patch.saldo;
+      }
+    } else if(field === "orcamentoDiario"){
+      type = "budget_change";
+      payload.from = Number(current.orcamento_diario ?? 0);
+      const n = Number(value);
+      if(!Number.isFinite(n) || n < 0){
+        res.status(400).json({ error:"Orçamento inválido" });
+        return;
+      }
+      patch.orcamento_diario = Number(n.toFixed(2));
+      payload.to = patch.orcamento_diario;
+    } else {
+      res.status(400).json({ error:"Campo inválido" });
       return;
     }
 
-    state.meta.version = currentV + 1;
+    const { data: updated, error: uErr } = await supabase
+      .from("stores")
+      .update(patch)
+      .eq("id", storeId)
+      .eq("store_version", storeVersion)
+      .select("*")
+      .single();
 
-    await put(PATHNAME, JSON.stringify(state), {
-      access:"public",
-      contentType:"application/json",
-      allowOverwrite:true,
-      addRandomSuffix:false,
-      cacheControlMaxAge:0
+    if(uErr) throw uErr;
+    if(!updated){
+      // alguém atualizou entre o select e o update
+      const { data: nowRow } = await supabase.from("stores").select("*").eq("id", storeId).single();
+      res.status(409).json({ error:"conflict", serverStore: nowRow ? mapStore(nowRow) : null });
+      return;
+    }
+
+    await supabase.from("history").insert({
+      actor: sess.user,
+      type,
+      store_id: storeId,
+      store_name: updated.nome,
+      payload
     });
 
-    // history
-    const type = (field === "saldo") ? "saldo_change" : "budget_change";
-    await appendEvent(newEvent(type, sess.user, {
-      storeId, storeName: applied.store.nome,
-      from: applied.before, to: applied.after,
-      source: "patch"
-    }));
-
-    res.status(200).json({ ok:true, version: state.meta.version, store: applied.store });
+    res.status(200).json({ ok:true, store: mapStore(updated) });
   } catch(e){
     console.error("API /api/store/update error:", e);
-    res.status(500).json({ error:String(e?.message ?? e) });
+    res.status(500).json({ error: String(e?.message ?? e) });
   }
 }

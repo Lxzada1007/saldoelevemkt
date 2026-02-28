@@ -1,37 +1,23 @@
-import { put, head } from "@vercel/blob";
 import { requireAuth } from "./_auth.js";
-
-const PATHNAME = "saldo/history.json";
-
-function defaultHistory(){
-  return { events: [] };
-}
-
-async function readHistory(){
-  try{
-    const meta = await head(PATHNAME);
-    const resp = await fetch(meta.url, { cache: "no-store" });
-    if(!resp.ok) throw new Error(`fetch blob ${resp.status}`);
-    const data = await resp.json();
-    if(!data || typeof data !== "object" || !Array.isArray(data.events)) return defaultHistory();
-    return data;
-  } catch(e){
-    return defaultHistory();
-  }
-}
+import { supabaseAdmin } from "./_supabase.js";
 
 export default async function handler(req, res){
-  const sess = requireAuth(req, res);
-  if(!sess) return;
   try{
-    if(req.method !== "GET"){
-      res.setHeader("Allow", "GET");
-      res.status(405).json({ error: "Method Not Allowed" });
-      return;
-    }
-    const h = await readHistory();
-    res.setHeader("Cache-Control", "no-store");
-    res.status(200).json(h);
+    const sess = requireAuth(req, res);
+    if(!sess) return;
+
+    const supabase = supabaseAdmin();
+
+    const limit = Math.min(1000, Math.max(50, Number(req.query?.limit ?? 500)));
+    const { data, error } = await supabase
+      .from("history")
+      .select("*")
+      .order("ts", { ascending: false })
+      .limit(limit);
+
+    if(error) throw error;
+
+    res.status(200).json({ events: data || [] });
   } catch(e){
     console.error("API /api/history error:", e);
     res.status(500).json({ error: String(e?.message ?? e) });

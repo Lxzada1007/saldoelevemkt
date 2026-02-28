@@ -1,35 +1,27 @@
-# Saldo System (3 páginas + Cards mobile + Histórico + Cron)
+# Lista de Saldo (Supabase)
 
-## Páginas
-- `index.html` -> Lista de Saldo (somente lista, ordena SEM SALDO/ATENÇÃO/OK, editar e remover)
-- `config.html` -> Configuração (importar lista, recarregar, resetar)
-- `historico.html` -> Histórico (débitos do cron + alterações)
+Este projeto usa **Supabase Postgres** como banco (mais rápido e estável que Blob).
 
-## Persistência
-Vercel Blob:
-- `saldo/state.json`
-- `saldo/history.json`
+## 1) Configurar Supabase
 
-## Cron (Vercel)
-Este projeto inclui `vercel.json` com:
-- `/api/cron/daily` todo dia às 08:00.
+1. Crie um projeto no Supabase.
+2. Abra o **SQL Editor** e execute o arquivo `SUPABASE_SCHEMA.sql` (na raiz do projeto).
 
-### Timezone
-Por padrão usamos `America/Sao_Paulo`. Você pode definir:
-- `CRON_TZ=America/Sao_Paulo`
+## 2) Variáveis de ambiente (Vercel)
 
-### Segurança (opcional, recomendado)
-Defina:
-- `CRON_SECRET=uma_senha_qualquer`
+Configure em **Project → Settings → Environment Variables**:
 
-E configure o Cron do Vercel para enviar o header:
-- `x-cron-secret: <CRON_SECRET>`
+- `SUPABASE_URL` (Project Settings → API)
+- `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API → service_role **(NUNCA no frontend)**)
+- `AUTH_SECRET` (qualquer string forte para assinar o cookie de login)
+- `CRON_SECRET` (opcional, recomendado) — usado para proteger `/api/cron/daily`
 
-(Se não definir CRON_SECRET, o endpoint aceita sem header.)
+## 3) Cron (débito diário às 08:00)
 
-## Env vars obrigatórias
-- `BLOB_READ_WRITE_TOKEN` (já configurado no seu projeto)
+O débito diário roda no servidor via Vercel Cron chamando `/api/cron/daily`.
+
+> Se você usar `CRON_SECRET`, configure o header `x-cron-secret` no cron (no `vercel.json` do projeto).
 
 ## Observações
-- Em mobile, a Lista de Saldo aparece em **cards**.
-- Em desktop, aparece em **tabela**.
+- O histórico salva **quem** fez (Lucas/Mateus) e o cron salva como `cron`.
+- Conflitos agora são por **loja** (campo `storeVersion`), então editar várias lojas seguidas não “apaga” alterações anteriores.

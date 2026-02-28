@@ -18,7 +18,7 @@ async function patchWithConflict(actionName, fn){
   showLoadingOverlay(actionName);
   try{
     const baseV = state?.meta?.version ?? 0;
-    const resp = await fn(baseV);
+    const resp = await fn();
     if(resp && typeof resp.version === "number") state.meta.version = resp.version;
     setApiLabel("OK");
     return { ok:true, resp };
@@ -31,7 +31,7 @@ async function patchWithConflict(actionName, fn){
         state = await apiLoadState();
         render();
 
-        const resp2 = await fn(state?.meta?.version ?? 0);
+        const resp2 = await fn();
         if(resp2 && typeof resp2.version === "number") state.meta.version = resp2.version;
         setApiLabel("OK");
         return { ok:true, resp: resp2, retried:true };
@@ -166,9 +166,10 @@ function makeEditableInput(store, field){
         return;
       }
 
-      const result = await patchWithConflict("Salvando saldo…", (baseV) => apiUpdateStoreField({ storeId: store.id, field: "saldo", value: next }, baseV));
+      const result = await patchWithConflict("Salvando saldo…", (baseV) => apiUpdateStoreField({ storeId: store.id, field: "saldo", value: next, storeVersion: store.storeVersion }));
       if(result.ok){
         store.saldo = next;
+        if(result.resp?.store?.storeVersion !== undefined) store.storeVersion = result.resp.store.storeVersion;
       }
     } else {
       const old = store.orcamentoDiario ?? 0;
@@ -199,9 +200,10 @@ function makeEditableInput(store, field){
         return;
       }
 
-      const result = await patchWithConflict("Salvando orçamento…", (baseV) => apiUpdateStoreField({ storeId: store.id, field: "orcamentoDiario", value: next }, baseV));
+      const result = await patchWithConflict("Salvando orçamento…", (baseV) => apiUpdateStoreField({ storeId: store.id, field: "orcamentoDiario", value: next, storeVersion: store.storeVersion }));
       if(result.ok){
         store.orcamentoDiario = next;
+        if(result.resp?.store?.storeVersion !== undefined) store.storeVersion = result.resp.store.storeVersion;
       }
     }
     render();
@@ -250,7 +252,7 @@ async function removeStore(store){
   }
   if(!ok) return;
 
-  const result = await patchWithConflict("Removendo…", (baseV) => apiRemoveStore(store.id, baseV));
+  const result = await patchWithConflict("Removendo…", (baseV) => apiRemoveStore(store.id, store.storeVersion));
   if(result.ok){
     state.stores = state.stores.filter(s => s.id !== store.id);
       }
