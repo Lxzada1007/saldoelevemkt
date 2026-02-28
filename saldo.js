@@ -24,12 +24,13 @@ async function patchWithConflict(actionName, fn){
     return { ok:true, resp };
   } catch(e){
     console.error(e);
+
     if(e?.code === "CONFLICT"){
-      // Auto-resolve: recarrega e tenta novamente UMA vez
+      // 1) tenta resolver automaticamente uma única vez: recarrega e tenta novamente
       try{
-        showLoadingOverlay("Resolvendo conflito…");
         state = await apiLoadState();
         render();
+
         const resp2 = await fn(state?.meta?.version ?? 0);
         if(resp2 && typeof resp2.version === "number") state.meta.version = resp2.version;
         setApiLabel("OK");
@@ -37,16 +38,21 @@ async function patchWithConflict(actionName, fn){
       } catch(e2){
         console.error(e2);
         setApiLabel("CONFLITO");
-        const choice = await conflictDialog();
-        if(choice === "reload"){
-          try{ state = await apiLoadState(); render(); } catch(err){ console.error(err); }
-        }
-        return { ok:false, conflict:true };
       }
+
+      // 2) se ainda conflitar, pergunta o que fazer (sem travar em overlay)
+      hideLoadingOverlay();
+      const choice = await conflictDialog();
+      if(choice === "reload"){
+        try{ state = await apiLoadState(); render(); } catch(err){ console.error(err); }
+      }
+      return { ok:false, conflict:true };
     }
+
     setApiLabel("ERRO ao salvar");
     return { ok:false, error:true };
   } finally {
+    // garante que o overlay fecha mesmo se tiver modal
     hideLoadingOverlay();
   }
 }

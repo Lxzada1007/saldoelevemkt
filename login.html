@@ -12,22 +12,19 @@
       <header class="panel__header">
         <div>
           <h1>Login</h1>
-          <p class="muted small">Acesso restrito. Use um dos usuários: <strong>Lucas</strong> ou <strong>Mateus</strong>. Senha: <strong>admin</strong>.</p>
+          <p class="muted small">Acesso restrito. Use um dos usuários: <strong>Lucas</strong> ou <strong>Mateus</strong>. </p>
         </div>
       </header>
 
       <section class="tools" style="grid-template-columns:1fr;">
         <div class="card">
           <label class="label" for="user">Usuário</label>
-          <select id="user" class="cellInput" style="text-align:left; width:100%;">
-            <option value="Lucas">Lucas</option>
-            <option value="Mateus">Mateus</option>
-          </select>
+          <input id="user" class="cellInput" type="text" placeholder="Digite Lucas ou Mateus" style="width:100%; text-align:left;" autocomplete="username" />
 
           <div style="height:10px;"></div>
 
           <label class="label" for="pass">Senha</label>
-          <input id="pass" class="cellInput" type="password" style="width:100%; text-align:left;" value="admin" />
+          <input id="pass" class="cellInput" type="password" style="width:100%; text-align:left;" placeholder="Digite sua senha" autocomplete="current-password" />
 
           <div style="height:12px;"></div>
 
@@ -46,6 +43,6 @@
     </section>
   </main>
 
-  <script type="module" src="login.js?v=1772240900"></script>
+  <script type="module" src="login.js?v=1772241504"></script>
 </body>
 </html>

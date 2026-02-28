@@ -15,8 +15,12 @@ async function boot(){
   } catch {}
 
   document.getElementById("loginBtn").addEventListener("click", async () => {
-    const user = document.getElementById("user").value;
-    const pass = document.getElementById("pass").value;
+    const user = (document.getElementById("user").value || "").trim();
+    const pass = (document.getElementById("pass").value || "");
+    if(!user || !pass){
+      setMsg("Preencha usuário e senha.");
+      return;
+    }
     const remember = document.getElementById("remember").checked;
 
     showLoadingOverlay("Entrando…");
